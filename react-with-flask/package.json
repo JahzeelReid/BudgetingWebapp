@@ -11,8 +11,10 @@
     "api": "cd api && venv\\Scripts\\flask run --no-debugger"
   },
   "dependencies": {
+    "axios": "^1.11.0",
     "react": "^19.1.1",
-    "react-dom": "^19.1.1"
+    "react-dom": "^19.1.1",
+    "teller-connect-react": "^0.2.3"
   },
   "devDependencies": {
     "@eslint/js": "^9.33.0",
