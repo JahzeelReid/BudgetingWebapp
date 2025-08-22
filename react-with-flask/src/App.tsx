@@ -13,6 +13,7 @@ function App() {
   const [count, setCount] = useState(0)
   const [currentTime, setCurrentTime] = useState(0);
   const [token, setToken] = useState();
+  const [username, setUsername] = useState("");
   const app_id = "app_ph83hsn3hg9ukkife2000";
   
 
@@ -39,9 +40,11 @@ function App() {
   function getclientlist(accesstoken: any) {
     axios({
       method: "POST",
-      url: `/api/user`,
+      url: `/api/newuser`,
       data: {
         auth: accesstoken,
+        user: "username",
+        password: "password"
       },
     })
       .then((response) => {
@@ -80,6 +83,8 @@ function App() {
         </p>
         {/* <SimpleTellerConnect/> */}
         {/* <TellerConnectClass/> */}
+    
+        <input onChange={(e) => setUsername(e.target.value)}/>
         <button onClick={() => open()} disabled={!ready}>
           Connect a bank account
         </button>
