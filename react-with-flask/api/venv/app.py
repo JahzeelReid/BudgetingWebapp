@@ -46,6 +46,8 @@ class Transaction(db.Model):
     transaction_catagory: Mapped[str]
     amount: Mapped[int]
     account_id: Mapped[str] = mapped_column(nullable=True)
+    api_id: Mapped[str] = mapped_column(nullable=True)
+    date: Mapped[str] = mapped_column(nullable=True)
 
 
 with app.app_context():
@@ -95,6 +97,11 @@ def pquery():
     db.session.add(user)
     db.session.commit()
     print("user added")
+    # ######
+    new_user_id = db.one_or_404(db.select(User).filter_by(username=username))
+    # so we can add all the transactions
+    new_transaction_list = []
+    # ######
 
     print("accounts Response:")
     print(accounts)
@@ -124,6 +131,22 @@ def pquery():
             print("Account Id: ", bank_id)
             print("Catagory: ", catagory)
             print("Date", j["date"])
+            # #####
+            # Create a new transaction for every transaction in the list
+            new_transaction = Transaction(
+                user_id = new_user_id
+                transaction_catagory = catagory
+                amount = trans_value
+                account_id = bank_id
+                api_id = trans_id
+                date = j["date"]               
+            )
+            # commit transactions
+            db.session.add(new_transaction)
+            # #####
+    # ####
+    db.session.commit()
+    # ####
 
     # acc_id = account_info
     # "acc_phbau0vl0jg4d1rtu8000"
