@@ -35,6 +35,7 @@ class User(db.Model):
     username: Mapped[str] = mapped_column(unique=True)
     password: Mapped[str]
     account_list: Mapped[list] = mapped_column(JSON, default=list, nullable=True)
+    settings: 
     date: Mapped[str] = mapped_column(nullable=True)
 
 
