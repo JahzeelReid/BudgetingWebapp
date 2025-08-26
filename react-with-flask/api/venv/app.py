@@ -38,6 +38,13 @@ class User(db.Model):
     date: Mapped[str] = mapped_column(nullable=True)
 
 
+class Account(db.model):
+    # table that holds the bank account info
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int]
+    current_bal: Mapped[int]
+
+
 class Transaction(db.Model):
     # a table that holds all the transaction Data
     #
@@ -48,6 +55,7 @@ class Transaction(db.Model):
     account_id: Mapped[str] = mapped_column(nullable=True)
     api_id: Mapped[str] = mapped_column(nullable=True)
     date: Mapped[str] = mapped_column(nullable=True)
+    catagory_dict: Mapped[str] = mapped_column(nullable=True)
 
 
 with app.app_context():
@@ -98,7 +106,7 @@ def pquery():
     db.session.commit()
     print("user added")
     # ######
-    new_user_id = db.one_or_404(db.select(User).filter_by(username=username))
+    new_user_id = db.one_or_404(db.select(User).filter_by(username=user_name))
     # so we can add all the transactions
     new_transaction_list = []
     # ######
@@ -134,12 +142,12 @@ def pquery():
             # #####
             # Create a new transaction for every transaction in the list
             new_transaction = Transaction(
-                user_id = new_user_id
-                transaction_catagory = catagory
-                amount = trans_value
-                account_id = bank_id
-                api_id = trans_id
-                date = j["date"]               
+                user_id=new_user_id,  # type: ignore
+                transaction_catagory=catagory,
+                amount=trans_value,
+                account_id=bank_id,
+                api_id=trans_id,
+                date=j["date"],
             )
             # commit transactions
             db.session.add(new_transaction)
@@ -152,6 +160,28 @@ def pquery():
     # "acc_phbau0vl0jg4d1rtu8000"
     # "acc_phbau0vn0jg4d1rtu8000"
 
+    return {"done": "done"}
+
+
+@app.route("/api/getbalance", methods=["POST"])
+def getbalance():
+    # calls the username from the frontend
+    # queries that username i the data base
+    # if available pulls access token from db
+    # recieves the access token from the front end
+    authjson = request.get_json()
+    # prints the access token
+    print("Access Token Reponse:")
+    print(authjson)
+    # pulls vaariables out of the dictionary
+    acc_id = authjson["auth"]["user"]["id"]
+    user_name = authjson["user"]
+    access_token = authjson["auth"]["accessToken"]
+    # creats the url and parameters for api get request
+    url = "https://api.teller.io/accounts"
+    auth = HTTPBasicAuth(
+        authjson["auth"]["accessToken"], ""
+    )  # Teller uses access_token as username
     return {"done": "done"}
 
 
