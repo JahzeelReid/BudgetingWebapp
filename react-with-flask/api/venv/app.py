@@ -49,6 +49,24 @@ class Account(db.Model):
     current_bal: Mapped[int]
     last_four: Mapped[int] = mapped_column(unique=True)
     url: Mapped[str]
+    # setting should hold the percentage for each catagory in a dictionary
+    setting: Mapped[dict] = mapped_column(JSON, nullable=True)
+    # example setting: {settings:
+    #                     {Catagory: 
+    #                         {Rent: 25},
+    #                         {Grocery: 10}
+    #                         {}
+
+    #                     }
+    #                  }
+
+class Log(db.Model):
+    # creates a log so that past payperiods can be viewed 
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int]
+    paycheck_date: Mapped[str] = mapped_column(nullable=True)
+    acc_settings: Mapped[dict] = mapped_column(JSON, nullable=True)
+    final_bal: Mapped[int]
 
 
 class Transaction(db.Model):
@@ -64,6 +82,10 @@ class Transaction(db.Model):
     date: Mapped[str] = mapped_column(nullable=True)
     counterparty: Mapped[str] = mapped_column(nullable=True)
     description: Mapped[str] = mapped_column(nullable=True)
+
+
+    
+    
 
 
 with app.app_context():
