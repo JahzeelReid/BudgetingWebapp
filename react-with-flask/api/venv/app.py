@@ -19,6 +19,9 @@ app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///project.db"
 # initialize the app with the extension
 db.init_app(app)
 
+# init
+# get accesstoken -> call accounts
+
 
 class User(db.Model):
     # the user table, this table holds the user Id(which we create)
@@ -34,16 +37,17 @@ class User(db.Model):
     access_token: Mapped[str] = mapped_column(unique=True)
     username: Mapped[str] = mapped_column(unique=True)
     password: Mapped[str]
-    account_list: Mapped[list] = mapped_column(JSON, default=list, nullable=True)
-    settings: 
+    # account_list: Mapped[list] = mapped_column(JSON, default=list, nullable=True)
+    settings: Mapped[dict] = mapped_column(JSON, nullable=True)
     date: Mapped[str] = mapped_column(nullable=True)
 
 
-class Account(db.model):
+class Account(db.Model):
     # table that holds the bank account info
     id: Mapped[int] = mapped_column(primary_key=True)
     user_id: Mapped[int]
     current_bal: Mapped[int]
+    last_four: Mapped[int] = mapped_column(unique=True)
 
 
 class Transaction(db.Model):
@@ -51,6 +55,7 @@ class Transaction(db.Model):
     #
     transaction_id: Mapped[str] = mapped_column(primary_key=True)
     user_id: Mapped[int]
+    account_id: Mapped[int]
     transaction_catagory: Mapped[str]
     amount: Mapped[int]
     account_id: Mapped[str] = mapped_column(nullable=True)
@@ -73,12 +78,14 @@ def pquery():
     # recieves the access token from the front end
     authjson = request.get_json()
     # prints the access token
-    print("Access Token Reponse:")
-    print(authjson)
+    print("Received from frontend after Teller init")
+    # print(authjson)
     # pulls vaariables out of the dictionary
     acc_id = authjson["auth"]["user"]["id"]
     user_name = authjson["user"]
     access_token = authjson["auth"]["accessToken"]
+    print("Account id: ", acc_id, " Username: ", user_name, " Token: ", access_token)
+    print("_________________________________")
     # creats the url and parameters for api get request
     url = "https://api.teller.io/accounts"
     auth = HTTPBasicAuth(
@@ -88,8 +95,11 @@ def pquery():
     # the get request
     accounts_response = requests.get(url, auth=auth)
     # variable to hold the response parsed through json
-    # RESPOSE IS A LIST OF ACCOUNTS ASSOCIATED WITH THE USER
+    # RESPOnSE IS A LIST OF ACCOUNTS ASSOCIATED WITH THE USER
     accounts = accounts_response.json()
+    print("Received by calling 'accounts'")
+    print(accounts)
+    print("__________________________________\n\n")
 
     if accounts_response.status_code != 200:
         return jsonify({"error": accounts_response.text}), accounts_response.status_code
@@ -104,30 +114,43 @@ def pquery():
     )
 
     db.session.add(user)
-    db.session.commit()
+    db.session.flush()
+    # db.session.commit()
     print("user added")
     # ######
-    new_user_id = db.one_or_404(db.select(User).filter_by(username=user_name))
+    # new_user = db.one_or_404(db.select(User).filter_by(username=user_name))
+
     # so we can add all the transactions
     new_transaction_list = []
     # ######
 
-    print("accounts Response:")
-    print(accounts)
     # contains a list of bank account ids linked to the user
     # we will use this to track transactions by account
     account_id_list = []
 
     for i in range(len(accounts)):
         # grabs the bank account ids and appends to a list that can be added tp the database
-        account_id_list.append(accounts[i]["id"])
-        print("Account value  ", i)
+        # skip if credit
+        if accounts[i]["type"] == "credit":
+            continue
+
+        # account_id_list.append(accounts[i]["id"])
+        four_digits = accounts[i]["last_four"]
         url = accounts[i]["links"]["balances"]
         bal_info = requests.get(url, auth=auth)
-        print("balance: ", bal_info.json()["available"])
+        # calls the balance from the api
+        account_bal = bal_info.json()["available"]
+        print("account index: ", i)
+        print("balance: ", account_bal)
 
         url = accounts[i]["links"]["transactions"]
         trans_info = requests.get(url, auth=auth)
+        new_acc = Account(
+            user_id=user.id, current_bal=account_bal, last_four=four_digits
+        )
+        db.session.add(new_acc)
+        db.session.flush()
+
         print("transaction list: ")
         for j in trans_info.json()[:5]:
             trans_id = j["id"]
@@ -143,18 +166,20 @@ def pquery():
             # #####
             # Create a new transaction for every transaction in the list
             new_transaction = Transaction(
-                user_id=new_user_id,  # type: ignore
+                user_id=user.id,  # type: ignore
+                account_id=new_acc.id,
                 transaction_catagory=catagory,
                 amount=trans_value,
-                account_id=bank_id,
+                # account_id=bank_id,
                 api_id=trans_id,
                 date=j["date"],
             )
             # commit transactions
             db.session.add(new_transaction)
+            db.session.flush()
             # #####
     # ####
-    db.session.commit()
+    # db.session.commit()
     # ####
 
     # acc_id = account_info
@@ -174,7 +199,7 @@ def getbalance():
     # prints the access token
     print("Access Token Reponse:")
     print(authjson)
-    # pulls vaariables out of the dictionary
+    # pulls variables out of the dictionary
     acc_id = authjson["auth"]["user"]["id"]
     user_name = authjson["user"]
     access_token = authjson["auth"]["accessToken"]
@@ -190,16 +215,4 @@ def getbalance():
 # https://api.teller.io/accounts/acc_phaouss1gjg4d1rtu8000/balances
 
 
-# kick the can without sitting with the mistakes and taking accountability
-# Initiate sex
-# toy roulletee
-# rough sex
-# write post it notes
-
-
-# arcane trickster: 3 level 1 spells, 3 cantrips wizard spells
-# cantrip: mage Hand, mind sliver, friends
-# level 1: Fog Cloud, sleep, Id Insinuation (UA)
-# Tomfoolery: 3 level1, 3 cantrips
-# contrips: mending, spare the dying, guidance
-# level1: Hex,  charm person, divine favor
+# envelope you have 100,
