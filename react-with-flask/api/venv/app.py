@@ -53,9 +53,9 @@ class Account(db.Model):
     setting: Mapped[dict] = mapped_column(JSON, nullable=True)
     # example setting: {settings:
     #                     {Catagory: 
-    #                         {Rent: 25},
-    #                         {Grocery: 10}
-    #                         {}
+    #                         {Rent: {percent:25}, {balance:$0}},
+    #                         {Grocery: {percent:25}, {balance:$0}},
+    #                         {Other: }
 
     #                     }
     #                  }
@@ -243,3 +243,11 @@ def getbalance():
 
 
 # envelope you have 100,
+# I need a function that updates all they data.
+# def full_update():
+# It needs to get all new balances from existing accounts in the database. 
+# If a new account is there add and flag for setting init
+# for each account: update balance, pull transactions that happened after the date on file, 
+#     add transaction value to account setting table in respective categories
+
+
