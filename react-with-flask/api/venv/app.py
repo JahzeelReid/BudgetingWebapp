@@ -48,12 +48,13 @@ class Account(db.Model):
     user_id: Mapped[int]
     current_bal: Mapped[int]
     last_four: Mapped[int] = mapped_column(unique=True)
+    url: Mapped[str]
 
 
 class Transaction(db.Model):
     # a table that holds all the transaction Data
     #
-    transaction_id: Mapped[str] = mapped_column(primary_key=True)
+    id: Mapped[int] = mapped_column(primary_key=True)
     user_id: Mapped[int]
     account_id: Mapped[int]
     transaction_catagory: Mapped[str]
@@ -61,7 +62,8 @@ class Transaction(db.Model):
     account_id: Mapped[str] = mapped_column(nullable=True)
     api_id: Mapped[str] = mapped_column(nullable=True)
     date: Mapped[str] = mapped_column(nullable=True)
-    catagory_dict: Mapped[str] = mapped_column(nullable=True)
+    counterparty: Mapped[str] = mapped_column(nullable=True)
+    description: Mapped[str] = mapped_column(nullable=True)
 
 
 with app.app_context():
@@ -146,7 +148,10 @@ def pquery():
         url = accounts[i]["links"]["transactions"]
         trans_info = requests.get(url, auth=auth)
         new_acc = Account(
-            user_id=user.id, current_bal=account_bal, last_four=four_digits
+            user_id=user.id,
+            current_bal=account_bal,
+            last_four=four_digits,
+            url=url,
         )
         db.session.add(new_acc)
         db.session.flush()
