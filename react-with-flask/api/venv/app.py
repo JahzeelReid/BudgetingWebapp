@@ -49,10 +49,11 @@ class Account(db.Model):
     current_bal: Mapped[int]
     last_four: Mapped[int] = mapped_column(unique=True)
     url: Mapped[str]
+    lastPaycheck_id: Mapped[int]
     # setting should hold the percentage for each catagory in a dictionary
     setting: Mapped[dict] = mapped_column(JSON, nullable=True)
     # example setting: {settings:
-    #                     {Catagory: 
+    #                     {Catagory:
     #                         {Rent: {percent:25}, {balance:$0}},
     #                         {Grocery: {percent:25}, {balance:$0}},
     #                         {Other: }
@@ -60,13 +61,15 @@ class Account(db.Model):
     #                     }
     #                  }
 
+
 class Log(db.Model):
-    # creates a log so that past payperiods can be viewed 
+    # creates a log so that past payperiods can be viewed
     id: Mapped[int] = mapped_column(primary_key=True)
     user_id: Mapped[int]
     paycheck_date: Mapped[str] = mapped_column(nullable=True)
     acc_settings: Mapped[dict] = mapped_column(JSON, nullable=True)
     final_bal: Mapped[int]
+    lastPaycheck_id: Mapped[int]
 
 
 class Transaction(db.Model):
@@ -82,10 +85,6 @@ class Transaction(db.Model):
     date: Mapped[str] = mapped_column(nullable=True)
     counterparty: Mapped[str] = mapped_column(nullable=True)
     description: Mapped[str] = mapped_column(nullable=True)
-
-
-    
-    
 
 
 with app.app_context():
@@ -216,26 +215,62 @@ def pquery():
     return {"done": "done"}
 
 
-@app.route("/api/getbalance", methods=["POST"])
-def getbalance():
-    # calls the username from the frontend
-    # queries that username i the data base
-    # if available pulls access token from db
-    # recieves the access token from the front end
-    authjson = request.get_json()
-    # prints the access token
-    print("Access Token Reponse:")
-    print(authjson)
-    # pulls variables out of the dictionary
-    acc_id = authjson["auth"]["user"]["id"]
-    user_name = authjson["user"]
-    access_token = authjson["auth"]["accessToken"]
-    # creats the url and parameters for api get request
+def full_update(user_id):
+    user = db.get_or_404(User, user_id)
+    token = user.access_token
+    auth = HTTPBasicAuth(token, "")
     url = "https://api.teller.io/accounts"
-    auth = HTTPBasicAuth(
-        authjson["auth"]["accessToken"], ""
-    )  # Teller uses access_token as username
-    return {"done": "done"}
+    accounts = requests.get(url, auth=auth).json()
+    user_accounts = Account.query.filter(Account.user_id == user_id).all()
+
+    for i in range(len(accounts)):
+        if accounts[i]["type"] == "credit":
+            continue
+        # check if account is in db
+        stored = False
+        last4 = accounts[i]["last_four"]
+        for stored_acc in user_accounts:
+            if stored_acc.last_four == last4:
+                stored = True
+                # if
+                break
+        if stored == False:
+            # add to the database
+            pass
+        else:
+            # update the database
+            # use last4 to query for account id, edit from there
+            acc = Account.query.filter(
+                Account.user_id == user_id, Account.last_four == last4
+            ).first()
+            update_acc_bal(acc)
+
+            pass
+
+
+def update_acc_bal(acc, token):
+    # link to transactions
+    # This should call all transactions and iterate down,
+    # adding transactions that havent been added yet
+    url = acc.url
+    auth = HTTPBasicAuth(token, "")
+    trans_info = requests.get(url, auth=auth).json()
+    # for each transaction query if
+    for j in trans_info.json():
+        trans_id = j["id"]
+        trans_value = j["amount"]
+        bank_id = j["account_id"]
+        catagory = j["details"]["category"]
+        transaction = Transaction.query.filter(
+            Transaction.user_id == acc.user_id, Transaction.api_id == trans_id
+        ).first()
+        if transaction:
+            # woohoo its already in the database
+            pass
+        else:
+            # not in the database
+            # we need to add to the database and update the setting to add the dollar amount to the balances
+            pass
 
 
 # https://api.teller.io/accounts/acc_phaouss0gjg4d1rtu8000/balances
@@ -245,9 +280,7 @@ def getbalance():
 # envelope you have 100,
 # I need a function that updates all they data.
 # def full_update():
-# It needs to get all new balances from existing accounts in the database. 
+# It needs to get all new balances from existing accounts in the database.
 # If a new account is there add and flag for setting init
-# for each account: update balance, pull transactions that happened after the date on file, 
+# for each account: update balance, pull transactions that happened after the date on file,
 #     add transaction value to account setting table in respective categories
-
-
