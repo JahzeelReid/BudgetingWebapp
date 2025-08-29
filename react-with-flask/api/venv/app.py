@@ -293,6 +293,15 @@ def update_acc_bal(acc, token):
                 trans_value >= acc.settings["paycheck_threshold"]
                 and catagory == "income"
             ):
+                new_log= Log(
+                    user_id: acc.user_id,
+                    paycheck_date = none,
+                
+                
+                acc_setting=acc.setting,
+                final_bal: acc.current_bal,
+    lastPaycheck_id: acc.lastpaycheck_id,
+                )
                 # mark as paycheck by updating account id
                 acc.lastpaycheck_id = new_transaction.id
             else:
