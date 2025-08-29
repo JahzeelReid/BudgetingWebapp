@@ -52,15 +52,13 @@ class Account(db.Model):
     lastpaycheck_id: Mapped[int]
     # setting should hold the percentage for each catagory in a dictionary
     setting: Mapped[dict] = mapped_column(JSON, nullable=True)
-    # example setting: {settings:
-    #                     {paycheck_threshold: $1200}
-    #                     {Catagory:
-    #                         {Rent: {percent:25}, {balance:$0}},
-    #                         {Grocery: {percent:25}, {balance:$0}},
-    #                         {Other: }
-
-    #                     }
-    #                  }
+    # example setting: {
+    #                     paycheck_threshold: $1200,
+    #                     Catagory: {
+    #                         Rent: {percent:25, balance:$0, goal: 300},
+    #                         Grocery: {percent:25, balance:$0, goal: 300},
+    #                         Other: {balance: 0}
+    # }}
 
 
 class Log(db.Model):
@@ -262,7 +260,7 @@ def update_acc_bal(acc, token):
         trans_value = j["amount"]
         bank_id = j["account_id"]
         catagory = j["details"]["category"]
-        desciption = j["description"]
+        descrip = j["description"]
         counterparty = j["details"]["counterparty"]
         transaction = Transaction.query.filter(
             Transaction.user_id == acc.user_id, Transaction.api_id == trans_id
@@ -277,25 +275,36 @@ def update_acc_bal(acc, token):
             # if positive check if it passes paycheck threshold
             # if so mark as paycheck
 
-            
             new_transaction = Transaction(
-                user_id=user.id,  
+                user_id=acc.user_id,
                 account_id=acc.id,
                 transaction_catagory=catagory,
                 amount=trans_value,
                 # account_id=bank_id,
                 api_id=trans_id,
+                counterparty=counterparty,
+                description=descrip,
                 date=j["date"],
             )
             db.session.add(new_transaction)
             db.session.flush()
-            
-            if trans_value >= acc.settings["paycheck_threshold"] and catagory == "income":
+
+            if (
+                trans_value >= acc.settings["paycheck_threshold"]
+                and catagory == "income"
+            ):
                 # mark as paycheck by updating account id
                 acc.lastpaycheck_id = new_transaction.id
-            # take catagory and iterate through the setting, if the catagory is in settings add the balance to that catagory, if its not in setting
-            # add to "other" catagory
-            
+            else:
+                # take catagory and iterate through the setting, if the catagory is in settings add the balance to that catagory, if its not in setting
+                # add to "other" catagory
+                # extract keys from acc setting
+                set_catagories = list(acc.setting["catagory"].keys())
+                if catagory in set_catagories:
+                    acc.setting["catagory"][catagory]["balance"] += trans_value * -1
+                else:
+                    acc.setting["catagory"]["other"]["balance"] += trans_value * -1
+
             pass
 
 
