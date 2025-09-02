@@ -52,7 +52,8 @@ class Account(db.Model):
     lastpaycheck_id: Mapped[int]
     # setting should hold the percentage for each catagory in a dictionary
     setting: Mapped[dict] = mapped_column(JSON, nullable=True)
-    # example setting: {
+    # example setting: {    
+    #                     init: False,
     #                     paycheck_threshold: $1200,
     #                     Catagory: {
     #                         Rent: {percent:25, balance:$0, goal: 300},
@@ -69,6 +70,7 @@ class Log(db.Model):
     acc_settings: Mapped[dict] = mapped_column(JSON, nullable=True)
     final_bal: Mapped[int]
     lastPaycheck_id: Mapped[int]
+    account_id: Mapped[int]
 
 
 class Transaction(db.Model):
@@ -215,39 +217,78 @@ def pquery():
 
 
 def full_update(user_id):
+    # Inputs: user_id | we use this to identify the accounts that will be updated
+    # output: 404 | if the user doesn't exist in db
+    # Purpose: This function will update all the balances associated
+    #     it does this by iterating through the new transactions, 
+    #     adding the charges to their respective buckets
+    
+    # Gets the user object
     user = db.get_or_404(User, user_id)
+    # Pulls the access token stored on DB
     token = user.access_token
+    # Pulls all related accounts from the api
     auth = HTTPBasicAuth(token, "")
     url = "https://api.teller.io/accounts"
     accounts = requests.get(url, auth=auth).json()
+    # Pulls the accounts we have on File. We will be comparing what we recieve to what we have
     user_accounts = Account.query.filter(Account.user_id == user_id).all()
-
+    # For loop that iterate through every account we pull from api
     for i in range(len(accounts)):
+        # As of now this is a debit account tracker so we exclude credit
         if accounts[i]["type"] == "credit":
             continue
+        
+        #######
+        # Grabs identifying info from api pulled accounts
+        # we use last 4 to identify
+        last4 = accounts[i]["last_four"]
+        # calls the balance for account so we can update our db
+        url = accounts[i]["links"]["balances"]
+        bal_info = requests.get(url, auth=auth)
+        account_bal = bal_info.json()["available"]
+        ######
+
         # check if account is in db
         stored = False
-        last4 = accounts[i]["last_four"]
+        # for each account in our database
         for stored_acc in user_accounts:
+            # check if we have account that has a last 4 that matches the acc we pulled from api
             if stored_acc.last_four == last4:
+                # if so we have a match so we just update our db
                 stored = True
-                # if
+                # 
                 break
         if stored == False:
-            # add to the database
+            # If false, the account we pulled from api is new and need to be initialized
+            # NOT DONE NEEDS WORK
+            new_acc = Account(
+            user_id=user.id,
+            current_bal=account_bal,
+            last_four=last4,
+            url=url,
+            settings= {"init": FALSE}
+            )
+            db.session.add(new_acc)
+            
             pass
         else:
             # update the database
+            # 
             # use last4 to query for account id, edit from there
             acc = Account.query.filter(
                 Account.user_id == user_id, Account.last_four == last4
             ).first()
-            update_acc_bal(acc)
+            # EDIT BALANCE HERE
+            oldbal = acc.current_bal 
+            acc.current_bal = account_bal
+            update_acc_bal(acc, token, oldbal)
+            
 
             pass
 
 
-def update_acc_bal(acc, token):
+def update_acc_bal(acc, token, old_balance):
     # link to transactions
     # This should call all transactions and iterate down,
     # adding transactions that havent been added yet
@@ -295,12 +336,11 @@ def update_acc_bal(acc, token):
             ):
                 new_log= Log(
                     user_id: acc.user_id,
-                    paycheck_date = none,
-                
-                
-                acc_setting=acc.setting,
-                final_bal: acc.current_bal,
-    lastPaycheck_id: acc.lastpaycheck_id,
+                    final_bal: old_balance,
+                    lastPaycheck_id: acc.lastpaycheck_id,
+                    account_id=acc.id,
+                    paycheck_date=acc.paycheck_date,
+                    acc_settings=acc.setting,
                 )
                 # mark as paycheck by updating account id
                 acc.lastpaycheck_id = new_transaction.id
@@ -315,7 +355,12 @@ def update_acc_bal(acc, token):
                     acc.setting["catagory"]["other"]["balance"] += trans_value * -1
 
             pass
-
+def init_settings():
+    # should be an api endpoint that recieves setting info from the frontend
+    # that setting info is saved to the db
+    # need to call update
+    # update_acc_bal(acc, token, oldbal)
+    pass
 
 # https://api.teller.io/accounts/acc_phaouss0gjg4d1rtu8000/balances
 # https://api.teller.io/accounts/acc_phaouss1gjg4d1rtu8000/balances
