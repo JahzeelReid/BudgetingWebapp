@@ -12,9 +12,11 @@ import { useTellerConnect } from 'teller-connect-react';
 function App() {
   const [count, setCount] = useState(0)
   const [currentTime, setCurrentTime] = useState(0);
+  const [logged_in, setLoginIn] = useState(false)
   const [token, setToken] = useState();
   const [username, setUsername] = useState("");
   const app_id = "app_ph83hsn3hg9ukkife2000";
+  const [response, setResponse] = useState();
   
 
   const { open, ready } = useTellerConnect({
@@ -24,6 +26,7 @@ function App() {
       // Save your access token here
       console.log("Sandbox Access Token:", authorization.accessToken);
       getclientlist(authorization)
+      pullallusers()
       // send to api
       // token = authorization.accessToken;
       // setToken(authorization.accessToken)
@@ -43,12 +46,12 @@ function App() {
       url: `/api/newuser`,
       data: {
         auth: accesstoken,
-        user: "username",
+        user: username,
         password: "password"
       },
     })
       .then((response) => {
-        setToken(response.data);
+        setResponse(response.data);
       })
       .catch((error) => {
         if (error.response) {
@@ -58,6 +61,23 @@ function App() {
         }
       });
   }
+  function pullallusers() {
+      axios({
+      method: "GET",
+      url: `/api/getusers`,
+    })
+      .then((response) => {
+        setResponse(response.data);
+      })
+      .catch((error) => {
+        if (error.response) {
+          console.log(error.response);
+          console.log(error.response.status);
+          console.log(error.response.headers);
+        }
+      });
+
+  }
 
 
 
@@ -65,19 +85,30 @@ function App() {
   return (
     <>
       <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
+        
       </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>The current time is {new Date(currentTime * 1000).toLocaleString()}.</p>
+      <h1>Test values</h1>
+      {logged_in ? <div>
+        <h1>Here we go again</h1>
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>User</th>
+              <th>token</th>
+            </tr>
+          </thead>
+          <tbody>
+            response.map()
+          </tbody>
+        </table>
+
+
+      
+        </div>
+      
+      : <div>
+        
         <p>
           Edit <code>src/App.tsx</code> and save to test HMR
         </p>
@@ -87,8 +118,12 @@ function App() {
         <input onChange={(e) => setUsername(e.target.value)}/>
         <button onClick={() => open()} disabled={!ready}>
           Connect a bank account
-        </button>
+        </button> 
         {/* <p>Access values: {token} </p> */}
+
+        </div>}
+      <div className="card">
+        
         
 
       </div>

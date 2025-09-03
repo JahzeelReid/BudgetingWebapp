@@ -48,14 +48,14 @@ class Account(db.Model):
     user_id: Mapped[int]
     current_bal: Mapped[int]
     last_four: Mapped[int] = mapped_column(unique=True)
-    url: Mapped[str]
-    lastpaycheck_id: Mapped[int]
+    url: Mapped[str] = mapped_column(nullable=True)
+    lastpaycheck_id: Mapped[int] = mapped_column(nullable=True)
     # setting should hold the percentage for each catagory in a dictionary
     setting: Mapped[dict] = mapped_column(JSON, nullable=True)
-    # example setting: {    
+    # example setting: {
     #                     init: False,
     #                     paycheck_threshold: $1200,
-    #                     Catagory: {
+    #                     catagory: {
     #                         Rent: {percent:25, balance:$0, goal: 300},
     #                         Grocery: {percent:25, balance:$0, goal: 300},
     #                         Other: {balance: 0}
@@ -139,7 +139,7 @@ def pquery():
 
     db.session.add(user)
     db.session.flush()
-    # db.session.commit()
+    db.session.commit()
     print("user added")
     # ######
     # new_user = db.one_or_404(db.select(User).filter_by(username=user_name))
@@ -174,37 +174,46 @@ def pquery():
             current_bal=account_bal,
             last_four=four_digits,
             url=url,
+            setting={
+                "init": True,
+                "paycheck_threshold": 1200,
+                "catagory": {
+                    "groceries": {"percent": 25, "balance": 0, "goal": 300},
+                    "fuel": {"percent": 25, "balance": 0, "goal": 300},
+                    "other": {"percent": 50, "balance": 0, "goal": 300},
+                },
+            },
         )
         db.session.add(new_acc)
         db.session.flush()
 
-        print("transaction list: ")
-        for j in trans_info.json()[:5]:
-            trans_id = j["id"]
-            trans_value = j["amount"]
-            bank_id = j["account_id"]
-            catagory = j["details"]["category"]
-            print()
-            print("Id: ", trans_id)
-            print("Value: ", trans_value)
-            print("Account Id: ", bank_id)
-            print("Catagory: ", catagory)
-            print("Date", j["date"])
-            # #####
-            # Create a new transaction for every transaction in the list
-            new_transaction = Transaction(
-                user_id=user.id,  # type: ignore
-                account_id=new_acc.id,
-                transaction_catagory=catagory,
-                amount=trans_value,
-                # account_id=bank_id,
-                api_id=trans_id,
-                date=j["date"],
-            )
-            # commit transactions
-            db.session.add(new_transaction)
-            db.session.flush()
-            # #####
+        # print("transaction list: ")
+        # for j in trans_info.json()[:5]:
+        #     trans_id = j["id"]
+        #     trans_value = j["amount"]
+        #     bank_id = j["account_id"]
+        #     catagory = j["details"]["category"]
+        #     print()
+        #     print("Id: ", trans_id)
+        #     print("Value: ", trans_value)
+        #     print("Account Id: ", bank_id)
+        #     print("Catagory: ", catagory)
+        #     print("Date", j["date"])
+        #     # #####
+        #     # Create a new transaction for every transaction in the list
+        #     new_transaction = Transaction(
+        #         user_id=user.id,  # type: ignore
+        #         account_id=new_acc.id,
+        #         transaction_catagory=catagory,
+        #         amount=trans_value,
+        #         # account_id=bank_id,
+        #         api_id=trans_id,
+        #         date=j["date"],
+        #     )
+        #     # commit transactions
+        #     db.session.add(new_transaction)
+        #     db.session.flush()
+        # #####
     # ####
     # db.session.commit()
     # ####
@@ -216,13 +225,24 @@ def pquery():
     return {"done": "done"}
 
 
+@app.route("/api/getusers", methods=["GET"])
+def getusers():
+    users = User.query.all()
+    prod = {"user": []}
+    for user in users:
+        prod["users"].append(
+            {"id": user.id, "username": user.username, "settings": user.setting}
+        )
+    return prod
+
+
 def full_update(user_id):
     # Inputs: user_id | we use this to identify the accounts that will be updated
     # output: 404 | if the user doesn't exist in db
     # Purpose: This function will update all the balances associated
-    #     it does this by iterating through the new transactions, 
+    #     it does this by iterating through the new transactions,
     #     adding the charges to their respective buckets
-    
+
     # Gets the user object
     user = db.get_or_404(User, user_id)
     # Pulls the access token stored on DB
@@ -238,7 +258,7 @@ def full_update(user_id):
         # As of now this is a debit account tracker so we exclude credit
         if accounts[i]["type"] == "credit":
             continue
-        
+
         #######
         # Grabs identifying info from api pulled accounts
         # we use last 4 to identify
@@ -257,33 +277,32 @@ def full_update(user_id):
             if stored_acc.last_four == last4:
                 # if so we have a match so we just update our db
                 stored = True
-                # 
+                #
                 break
         if stored == False:
             # If false, the account we pulled from api is new and need to be initialized
             # NOT DONE NEEDS WORK
             new_acc = Account(
-            user_id=user.id,
-            current_bal=account_bal,
-            last_four=last4,
-            url=url,
-            settings= {"init": FALSE}
+                user_id=user.id,
+                current_bal=account_bal,
+                last_four=last4,
+                url=url,
+                settings={"init": False},
             )
             db.session.add(new_acc)
-            
+
             pass
         else:
             # update the database
-            # 
+            #
             # use last4 to query for account id, edit from there
             acc = Account.query.filter(
                 Account.user_id == user_id, Account.last_four == last4
             ).first()
             # EDIT BALANCE HERE
-            oldbal = acc.current_bal 
+            oldbal = acc.current_bal
             acc.current_bal = account_bal
             update_acc_bal(acc, token, oldbal)
-            
 
             pass
 
@@ -334,10 +353,10 @@ def update_acc_bal(acc, token, old_balance):
                 trans_value >= acc.settings["paycheck_threshold"]
                 and catagory == "income"
             ):
-                new_log= Log(
-                    user_id: acc.user_id,
-                    final_bal: old_balance,
-                    lastPaycheck_id: acc.lastpaycheck_id,
+                new_log = Log(
+                    user_id=acc.user_id,
+                    final_bal=old_balance,
+                    lastPaycheck_id=acc.lastpaycheck_id,
                     account_id=acc.id,
                     paycheck_date=acc.paycheck_date,
                     acc_settings=acc.setting,
@@ -355,12 +374,15 @@ def update_acc_bal(acc, token, old_balance):
                     acc.setting["catagory"]["other"]["balance"] += trans_value * -1
 
             pass
+
+
 def init_settings():
     # should be an api endpoint that recieves setting info from the frontend
     # that setting info is saved to the db
     # need to call update
     # update_acc_bal(acc, token, oldbal)
     pass
+
 
 # https://api.teller.io/accounts/acc_phaouss0gjg4d1rtu8000/balances
 # https://api.teller.io/accounts/acc_phaouss1gjg4d1rtu8000/balances
