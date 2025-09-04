@@ -98,7 +98,7 @@ def get_current_time():
 
 
 @app.route("/api/newuser", methods=["POST"])
-def pquery():
+def init_user():
     # recieves the access token from the front end
     authjson = request.get_json()
     # prints the access token
@@ -186,41 +186,8 @@ def pquery():
         )
         db.session.add(new_acc)
         db.session.flush()
+        db.session.commit()
 
-        # print("transaction list: ")
-        # for j in trans_info.json()[:5]:
-        #     trans_id = j["id"]
-        #     trans_value = j["amount"]
-        #     bank_id = j["account_id"]
-        #     catagory = j["details"]["category"]
-        #     print()
-        #     print("Id: ", trans_id)
-        #     print("Value: ", trans_value)
-        #     print("Account Id: ", bank_id)
-        #     print("Catagory: ", catagory)
-        #     print("Date", j["date"])
-        #     # #####
-        #     # Create a new transaction for every transaction in the list
-        #     new_transaction = Transaction(
-        #         user_id=user.id,  # type: ignore
-        #         account_id=new_acc.id,
-        #         transaction_catagory=catagory,
-        #         amount=trans_value,
-        #         # account_id=bank_id,
-        #         api_id=trans_id,
-        #         date=j["date"],
-        #     )
-        #     # commit transactions
-        #     db.session.add(new_transaction)
-        #     db.session.flush()
-        # #####
-    # ####
-    # db.session.commit()
-    # ####
-
-    # acc_id = account_info
-    # "acc_phbau0vl0jg4d1rtu8000"
-    # "acc_phbau0vn0jg4d1rtu8000"
 
     return {"done": "done"}
 
@@ -230,8 +197,12 @@ def getusers():
     users = User.query.all()
     prod = {"user": []}
     for user in users:
+        accounts = Account.query.filter(user_id=user.id).all()
+        accountlist = []
+        for account in accounts:
+            accountlist.append({"lastfour": account.last_four, "balance": account.current_bal, "settings": account.setting})
         prod["users"].append(
-            {"id": user.id, "username": user.username, "settings": user.setting}
+            {"id": user.id, "username": user.username, "settings": user.setting, "account":accountlist}
         )
     return prod
 
@@ -308,9 +279,16 @@ def full_update(user_id):
 
 
 def update_acc_bal(acc, token, old_balance):
-    # link to transactions
-    # This should call all transactions and iterate down,
-    # adding transactions that havent been added yet
+    # takes an account object, the user token, and the previous balance
+    # this function updates the database catagories found in account.settings
+    # this function should parse through all new transactions
+    # after the date in acc.date
+    # if it find income, save the previous settings as a log, 
+        # update the date and reset the catagories
+    # get an list of all new transactions?
+    # do transactions come in order?
+    # we can go through each transaction in the db if no match, add to list
+    
     url = acc.url
     auth = HTTPBasicAuth(token, "")
     trans_info = requests.get(url, auth=auth).json()
@@ -353,6 +331,7 @@ def update_acc_bal(acc, token, old_balance):
                 trans_value >= acc.settings["paycheck_threshold"]
                 and catagory == "income"
             ):
+                # create a log, reset catagory, update account and date
                 new_log = Log(
                     user_id=acc.user_id,
                     final_bal=old_balance,
@@ -375,12 +354,37 @@ def update_acc_bal(acc, token, old_balance):
 
             pass
 
-
-def init_settings():
+@app.route("/api/newsettings", methods=["POST"])
+def change_settings():
     # should be an api endpoint that recieves setting info from the frontend
     # that setting info is saved to the db
     # need to call update
     # update_acc_bal(acc, token, oldbal)
+    data = request.get_json()
+    user_id = data["user_id"]
+    account_id = data["acc_id"]
+    catagory_list = data["catagory"]
+    init = data["init"]
+    account = Account.query.filter(id=account_id).first()
+    
+    if init: 
+        # we are going to grab the new catagories and refactor on the inside 
+        # so no disticntion between new catagories and old catagories
+        # just grab the catagories from data and repopulate with transactions for each catagory
+        # need to refactor update_acc_bal() to incorporate dates
+        # we only want from the current pay period
+        account.setting["catagory"] = catagory_list        
+        
+    else:
+        # ["settings"] is empty, populate straight from data
+        # update init to true
+        account.setting["catagory"] = catagory_list
+        account.setting["init"] = True
+        
+        
+    
+    
+    
     pass
 
 
@@ -388,10 +392,4 @@ def init_settings():
 # https://api.teller.io/accounts/acc_phaouss1gjg4d1rtu8000/balances
 
 
-# envelope you have 100,
-# I need a function that updates all they data.
-# def full_update():
-# It needs to get all new balances from existing accounts in the database.
-# If a new account is there add and flag for setting init
-# for each account: update balance, pull transactions that happened after the date on file,
-#     add transaction value to account setting table in respective categories
+
