@@ -9,6 +9,16 @@ import './App.css'
 // import { TellerConnect } from 'teller-connect-react';
 import { useTellerConnect } from 'teller-connect-react';
 
+interface User {
+  id: number;
+  username: string;
+  account: string;
+}
+
+interface ResponseData {
+  user: User[];
+}
+
 function App() {
   const [count, setCount] = useState(0)
   const [currentTime, setCurrentTime] = useState(0);
@@ -16,7 +26,7 @@ function App() {
   const [token, setToken] = useState();
   const [username, setUsername] = useState("");
   const app_id = "app_ph83hsn3hg9ukkife2000";
-  const [response, setResponse] = useState();
+  const [response, setResponse] = useState<ResponseData | null>(null);
   
 
   const { open, ready } = useTellerConnect({
@@ -35,10 +45,8 @@ function App() {
   });
 
   useEffect(() => {
-    fetch('/api/time').then(res => res.json()).then(data => {
-      setCurrentTime(data.time);
-    });
-  }, []);
+    pullallusers()
+  }, [logged_in]);
 
   function getclientlist(accesstoken: any) {
     axios({
@@ -52,6 +60,7 @@ function App() {
     })
       .then((response) => {
         setResponse(response.data);
+        setLoginIn(true);
       })
       .catch((error) => {
         if (error.response) {
@@ -62,7 +71,7 @@ function App() {
       });
   }
   function pullallusers() {
-      axios({
+      axios<ResponseData>({
       method: "GET",
       url: `/api/getusers`,
     })
@@ -99,7 +108,13 @@ function App() {
             </tr>
           </thead>
           <tbody>
-            response.map()
+            {response?.user.map((user, index) => (
+              <tr key={index}>
+                <td>{user.id}</td>
+                <td>{user.username}</td>
+                {/* <td>{user.account.lastfour}, ${user.account.balance} </td> */}
+              </tr>
+            ))}
           </tbody>
         </table>
 
@@ -109,11 +124,6 @@ function App() {
       
       : <div>
         
-        <p>
-          Edit <code>src/App.tsx</code> and save to test HMR
-        </p>
-        {/* <SimpleTellerConnect/> */}
-        {/* <TellerConnectClass/> */}
     
         <input onChange={(e) => setUsername(e.target.value)}/>
         <button onClick={() => open()} disabled={!ready}>
@@ -127,9 +137,6 @@ function App() {
         
 
       </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
     </>
   )
 }

@@ -47,7 +47,7 @@ class Account(db.Model):
     id: Mapped[int] = mapped_column(primary_key=True)
     user_id: Mapped[int]
     current_bal: Mapped[int]
-    last_four: Mapped[int] = mapped_column(unique=True)
+    last_four: Mapped[int]
     url: Mapped[str] = mapped_column(nullable=True)
     lastpaycheck_id: Mapped[int] = mapped_column(nullable=True)
     # setting should hold the percentage for each catagory in a dictionary
@@ -167,8 +167,8 @@ def init_user():
         print("account index: ", i)
         print("balance: ", account_bal)
 
-        url = accounts[i]["links"]["transactions"]
-        trans_info = requests.get(url, auth=auth)
+        # url = accounts[i]["links"]["transactions"]
+        # trans_info = requests.get(url, auth=auth)
         new_acc = Account(
             user_id=user.id,
             current_bal=account_bal,
@@ -176,7 +176,7 @@ def init_user():
             url=url,
             setting={
                 "init": True,
-                "paycheck_threshold": 1200,
+                "paycheck_threshold": 200,
                 "catagory": {
                     "groceries": {"percent": 25, "balance": 0, "goal": 300},
                     "fuel": {"percent": 25, "balance": 0, "goal": 300},
@@ -188,21 +188,31 @@ def init_user():
         db.session.flush()
         db.session.commit()
 
-
     return {"done": "done"}
 
 
 @app.route("/api/getusers", methods=["GET"])
 def getusers():
     users = User.query.all()
-    prod = {"user": []}
+    prod = {"users": []}
     for user in users:
-        accounts = Account.query.filter(user_id=user.id).all()
+        full_update(user.id)
+        accounts = Account.query.filter(Account.user_id == user.id).all()
         accountlist = []
         for account in accounts:
-            accountlist.append({"lastfour": account.last_four, "balance": account.current_bal, "settings": account.setting})
+            accountlist.append(
+                {
+                    "lastfour": account.last_four,
+                    "balance": account.current_bal,
+                    "settings": account.setting,
+                }
+            )
         prod["users"].append(
-            {"id": user.id, "username": user.username, "settings": user.setting, "account":accountlist}
+            {
+                "id": user.id,
+                "username": user.username,
+                "account": accountlist,
+            }
         )
     return prod
 
@@ -258,7 +268,7 @@ def full_update(user_id):
                 current_bal=account_bal,
                 last_four=last4,
                 url=url,
-                settings={"init": False},
+                setting={"init": False},
             )
             db.session.add(new_acc)
 
@@ -283,12 +293,12 @@ def update_acc_bal(acc, token, old_balance):
     # this function updates the database catagories found in account.settings
     # this function should parse through all new transactions
     # after the date in acc.date
-    # if it find income, save the previous settings as a log, 
-        # update the date and reset the catagories
+    # if it find income, save the previous settings as a log,
+    # update the date and reset the catagories
     # get an list of all new transactions?
     # do transactions come in order?
     # we can go through each transaction in the db if no match, add to list
-    
+
     url = acc.url
     auth = HTTPBasicAuth(token, "")
     trans_info = requests.get(url, auth=auth).json()
@@ -300,6 +310,7 @@ def update_acc_bal(acc, token, old_balance):
         catagory = j["details"]["category"]
         descrip = j["description"]
         counterparty = j["details"]["counterparty"]
+        print(catagory)
         transaction = Transaction.query.filter(
             Transaction.user_id == acc.user_id, Transaction.api_id == trans_id
         ).first()
@@ -354,6 +365,7 @@ def update_acc_bal(acc, token, old_balance):
 
             pass
 
+
 @app.route("/api/newsettings", methods=["POST"])
 def change_settings():
     # should be an api endpoint that recieves setting info from the frontend
@@ -366,30 +378,23 @@ def change_settings():
     catagory_list = data["catagory"]
     init = data["init"]
     account = Account.query.filter(id=account_id).first()
-    
-    if init: 
-        # we are going to grab the new catagories and refactor on the inside 
+
+    if init:
+        # we are going to grab the new catagories and refactor on the inside
         # so no disticntion between new catagories and old catagories
         # just grab the catagories from data and repopulate with transactions for each catagory
         # need to refactor update_acc_bal() to incorporate dates
         # we only want from the current pay period
-        account.setting["catagory"] = catagory_list        
-        
+        account.setting["catagory"] = catagory_list
+
     else:
         # ["settings"] is empty, populate straight from data
         # update init to true
         account.setting["catagory"] = catagory_list
         account.setting["init"] = True
-        
-        
-    
-    
-    
+
     pass
 
 
 # https://api.teller.io/accounts/acc_phaouss0gjg4d1rtu8000/balances
 # https://api.teller.io/accounts/acc_phaouss1gjg4d1rtu8000/balances
-
-
-
