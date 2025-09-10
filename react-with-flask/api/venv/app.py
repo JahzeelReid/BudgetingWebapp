@@ -103,7 +103,7 @@ def init_user():
     authjson = request.get_json()
     # prints the access token
     print("Received from frontend after Teller init")
-    # print(authjson)
+    print(authjson)
     # pulls vaariables out of the dictionary
     acc_id = authjson["auth"]["user"]["id"]
     user_name = authjson["user"]
@@ -121,9 +121,9 @@ def init_user():
     # variable to hold the response parsed through json
     # RESPOnSE IS A LIST OF ACCOUNTS ASSOCIATED WITH THE USER
     accounts = accounts_response.json()
-    print("Received by calling 'accounts'")
-    print(accounts)
-    print("__________________________________\n\n")
+    # print("Received by calling 'accounts'")
+    # print(accounts)
+    # print("__________________________________\n\n")
 
     if accounts_response.status_code != 200:
         return jsonify({"error": accounts_response.text}), accounts_response.status_code
@@ -232,8 +232,17 @@ def full_update(user_id):
     auth = HTTPBasicAuth(token, "")
     url = "https://api.teller.io/accounts"
     accounts = requests.get(url, auth=auth).json()
+    print("pulled from api")
+    for user in accounts:
+        if user["type"] != "credit":
+            print(user["last_four"])
+
     # Pulls the accounts we have on File. We will be comparing what we recieve to what we have
     user_accounts = Account.query.filter(Account.user_id == user_id).all()
+    print("pulled from database:")
+    for user in user_accounts:
+        print(user.last_four)
+    print("done pulling from db")
     # For loop that iterate through every account we pull from api
     for i in range(len(accounts)):
         # As of now this is a debit account tracker so we exclude credit
@@ -271,8 +280,8 @@ def full_update(user_id):
                 setting={"init": False},
             )
             db.session.add(new_acc)
+            db.session.commit()
 
-            pass
         else:
             # update the database
             #
@@ -283,9 +292,8 @@ def full_update(user_id):
             # EDIT BALANCE HERE
             oldbal = acc.current_bal
             acc.current_bal = account_bal
+            db.session.commit()
             update_acc_bal(acc, token, oldbal)
-
-            pass
 
 
 def update_acc_bal(acc, token, old_balance):
@@ -337,6 +345,7 @@ def update_acc_bal(acc, token, old_balance):
             )
             db.session.add(new_transaction)
             db.session.flush()
+            db.session.commit()
 
             if (
                 trans_value >= acc.settings["paycheck_threshold"]
@@ -352,6 +361,7 @@ def update_acc_bal(acc, token, old_balance):
                     acc_settings=acc.setting,
                 )
                 # mark as paycheck by updating account id
+                print("new paycheck")
                 acc.lastpaycheck_id = new_transaction.id
             else:
                 # take catagory and iterate through the setting, if the catagory is in settings add the balance to that catagory, if its not in setting
@@ -363,7 +373,7 @@ def update_acc_bal(acc, token, old_balance):
                 else:
                     acc.setting["catagory"]["other"]["balance"] += trans_value * -1
 
-            pass
+        db.session.commit()
 
 
 @app.route("/api/newsettings", methods=["POST"])

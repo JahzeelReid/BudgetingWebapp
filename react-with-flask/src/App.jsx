@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import axios from "axios";
 
 import reactLogo from "./assets/react.svg";
@@ -10,22 +10,25 @@ import "./App.css";
 import { useTellerConnect } from "teller-connect-react";
 
 function App() {
-  const [count, setCount] = useState(0);
-  const [currentTime, setCurrentTime] = useState(0);
   const [logged_in, setLoginIn] = useState(false);
-  const [token, setToken] = useState();
+  //   const [token, setToken] = useState();
   const [username, setUsername] = useState("");
+  const [value, setvalue] = useState("");
   const app_id = "app_ph83hsn3hg9ukkife2000";
   const [response, setResponse] = useState(null);
-
+  console.log("username Before open:", username);
+  const usernameRef = useRef(username);
+  useEffect(() => {
+    usernameRef.current = username; // update ref whenever state changes
+  }, [username]);
   const { open, ready } = useTellerConnect({
     applicationId: app_id,
     environment: "sandbox",
     onSuccess: (authorization) => {
       // Save your access token here
       console.log("Sandbox Access Token:", authorization.accessToken);
-      getclientlist(authorization);
-      pullallusers();
+      console.log("username at onSuccess:", username);
+      getclientlist(authorization, usernameRef.current);
       // send to api
       // token = authorization.accessToken;
       // setToken(authorization.accessToken)
@@ -36,19 +39,26 @@ function App() {
     pullallusers();
   }, [logged_in]);
 
-  function getclientlist(accesstoken) {
+  function getclientlist(accesstoken, uname) {
+    console.log("sending uname param:", uname);
+    console.log("sending to backend:", {
+      auth: accesstoken,
+      user: uname,
+      password: "password",
+    });
+
     axios({
       method: "POST",
       url: `/api/newuser`,
       data: {
         auth: accesstoken,
-        user: username,
+        user: uname,
         password: "password",
       },
     })
       .then((response) => {
         setResponse(response.data);
-        setLoginIn(true);
+        // setLoginIn(true);
       })
       .catch((error) => {
         if (error.response) {
@@ -86,6 +96,7 @@ function App() {
       {logged_in ? (
         <div>
           <h1>Here we go again</h1>
+          <p>{username}</p>
           <table>
             <thead>
               <tr>
@@ -100,7 +111,7 @@ function App() {
                   <td>{user.id}</td>
                   <td>{user.username}</td>
                   <td>
-                    x{user.account[0].lastfour}, ${user.account[0].balance}
+                    {user.account[0].lastfour}, ${user.account[0].balance}
                     {/* <table>
                       <thead>
                         <tr>
@@ -124,8 +135,16 @@ function App() {
         </div>
       ) : (
         <div>
+          <p>{username}</p>
           <input onChange={(e) => setUsername(e.target.value)} />
-          <button onClick={() => open()} disabled={!ready}>
+          <button
+            onClick={() => {
+              setvalue(username);
+              console.log(value);
+              open();
+            }}
+            disabled={!ready}
+          >
             Connect a bank account
           </button>
           {/* <p>Access values: {token} </p> */}
