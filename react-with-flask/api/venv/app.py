@@ -240,8 +240,10 @@ def full_update(user_id):
     # Pulls the accounts we have on File. We will be comparing what we recieve to what we have
     user_accounts = Account.query.filter(Account.user_id == user_id).all()
     print("pulled from database:")
-    for user in user_accounts:
-        print(user.last_four)
+    database_last4 = []
+    for user_account in user_accounts:
+        print(user_account.last_four)
+        database_last4.append(user_account.last_four)
     print("done pulling from db")
     # For loop that iterate through every account we pull from api
     for i in range(len(accounts)):
@@ -260,29 +262,9 @@ def full_update(user_id):
         ######
 
         # check if account is in db
-        stored = False
-        # for each account in our database
-        for stored_acc in user_accounts:
-            # check if we have account that has a last 4 that matches the acc we pulled from api
-            if stored_acc.last_four == last4:
-                # if so we have a match so we just update our db
-                stored = True
-                #
-                break
-        if stored == False:
-            # If false, the account we pulled from api is new and need to be initialized
-            # NOT DONE NEEDS WORK
-            new_acc = Account(
-                user_id=user.id,
-                current_bal=account_bal,
-                last_four=last4,
-                url=url,
-                setting={"init": False},
-            )
-            db.session.add(new_acc)
-            db.session.commit()
 
-        else:
+        if last4 in database_last4:
+            # we update
             # update the database
             #
             # use last4 to query for account id, edit from there
@@ -294,6 +276,20 @@ def full_update(user_id):
             acc.current_bal = account_bal
             db.session.commit()
             update_acc_bal(acc, token, oldbal)
+
+            pass
+        else:
+            # If false, the account we pulled from api is new and need to be initialized
+            # NOT DONE NEEDS WORK
+            new_acc = Account(
+                user_id=user.id,
+                current_bal=account_bal,
+                last_four=last4,
+                url=url,
+                setting={"init": False},
+            )
+            db.session.add(new_acc)
+            db.session.commit()
 
 
 def update_acc_bal(acc, token, old_balance):
