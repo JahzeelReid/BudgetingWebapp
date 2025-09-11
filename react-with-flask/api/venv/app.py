@@ -47,8 +47,9 @@ class Account(db.Model):
     id: Mapped[int] = mapped_column(primary_key=True)
     user_id: Mapped[int]
     current_bal: Mapped[int]
-    last_four: Mapped[int]
-    url: Mapped[str] = mapped_column(nullable=True)
+    last_four: Mapped[str]
+    bal_url: Mapped[str] = mapped_column(nullable=True)
+    trans_url: Mapped[str] = mapped_column(nullable=True)
     lastpaycheck_id: Mapped[int] = mapped_column(nullable=True)
     # setting should hold the percentage for each catagory in a dictionary
     setting: Mapped[dict] = mapped_column(JSON, nullable=True)
@@ -160,8 +161,9 @@ def init_user():
 
         # account_id_list.append(accounts[i]["id"])
         four_digits = accounts[i]["last_four"]
-        url = accounts[i]["links"]["balances"]
-        bal_info = requests.get(url, auth=auth)
+        bal_url = accounts[i]["links"]["balances"]
+        trans_url = accounts[i]["links"]["transactions"]
+        bal_info = requests.get(bal_url, auth=auth)
         # calls the balance from the api
         account_bal = bal_info.json()["available"]
         print("account index: ", i)
@@ -173,7 +175,8 @@ def init_user():
             user_id=user.id,
             current_bal=account_bal,
             last_four=four_digits,
-            url=url,
+            bal_url=bal_url,
+            trans_url=trans_url
             setting={
                 "init": True,
                 "paycheck_threshold": 200,
@@ -233,9 +236,9 @@ def full_update(user_id):
     url = "https://api.teller.io/accounts"
     accounts = requests.get(url, auth=auth).json()
     print("pulled from api")
-    for user in accounts:
-        if user["type"] != "credit":
-            print(user["last_four"])
+    for user1 in accounts:
+        if user1["type"] != "credit":
+            print(user1["last_four"])
 
     # Pulls the accounts we have on File. We will be comparing what we recieve to what we have
     user_accounts = Account.query.filter(Account.user_id == user_id).all()
@@ -262,8 +265,10 @@ def full_update(user_id):
         ######
 
         # check if account is in db
-
+        print("current", last4)
+        print("db_last4 array: ", database_last4)
         if last4 in database_last4:
+            print(last4, " is in the db")
             # we update
             # update the database
             #
@@ -276,8 +281,6 @@ def full_update(user_id):
             acc.current_bal = account_bal
             db.session.commit()
             update_acc_bal(acc, token, oldbal)
-
-            pass
         else:
             # If false, the account we pulled from api is new and need to be initialized
             # NOT DONE NEEDS WORK
@@ -303,11 +306,12 @@ def update_acc_bal(acc, token, old_balance):
     # do transactions come in order?
     # we can go through each transaction in the db if no match, add to list
 
-    url = acc.url
+    url = acc.trans_url
     auth = HTTPBasicAuth(token, "")
     trans_info = requests.get(url, auth=auth).json()
+    print("printing ", trans_info)
     # for each transaction query if
-    for j in trans_info.json():
+    for j in trans_info:
         trans_id = j["id"]
         trans_value = j["amount"]
         bank_id = j["account_id"]
