@@ -106,13 +106,14 @@ function App() {
               </tr>
             </thead>
             <tbody>
-              {response?.users.map((user, index) => (
-                <tr key={index}>
-                  <td>{user.id}</td>
-                  <td>{user.username}</td>
-                  <td>
-                    {user.account[0].lastfour}, ${user.account[0].balance}
-                    {/* <table>
+              {response &&
+                response.users.map((user, index) => (
+                  <tr key={index}>
+                    <td>{user.id}</td>
+                    <td>{user.username}</td>
+                    <td>
+                      {user.account[0].lastfour}, ${user.account[0].balance}
+                      {/* <table>
                       <thead>
                         <tr>
                           <th>digits</th>
@@ -127,9 +128,9 @@ function App() {
                         ))}
                       </tbody>
                     </table> */}
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                  </tr>
+                ))}
             </tbody>
           </table>
         </div>

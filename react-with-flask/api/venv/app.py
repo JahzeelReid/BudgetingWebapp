@@ -6,6 +6,7 @@ from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.orm import DeclarativeBase
 from sqlalchemy import JSON, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
+from decimal import Decimal
 
 
 class Base(DeclarativeBase):
@@ -46,7 +47,7 @@ class Account(db.Model):
     # table that holds the bank account info
     id: Mapped[int] = mapped_column(primary_key=True)
     user_id: Mapped[int]
-    current_bal: Mapped[int]
+    current_bal: Mapped[float]
     last_four: Mapped[str]
     bal_url: Mapped[str] = mapped_column(nullable=True)
     trans_url: Mapped[str] = mapped_column(nullable=True)
@@ -69,7 +70,7 @@ class Log(db.Model):
     user_id: Mapped[int]
     paycheck_date: Mapped[str] = mapped_column(nullable=True)
     acc_settings: Mapped[dict] = mapped_column(JSON, nullable=True)
-    final_bal: Mapped[int]
+    final_bal: Mapped[float]
     lastPaycheck_id: Mapped[int]
     account_id: Mapped[int]
 
@@ -81,7 +82,7 @@ class Transaction(db.Model):
     user_id: Mapped[int]
     account_id: Mapped[int]
     transaction_catagory: Mapped[str]
-    amount: Mapped[int]
+    amount: Mapped[float]
     account_id: Mapped[str] = mapped_column(nullable=True)
     api_id: Mapped[str] = mapped_column(nullable=True)
     date: Mapped[str] = mapped_column(nullable=True)
@@ -176,13 +177,13 @@ def init_user():
             current_bal=account_bal,
             last_four=four_digits,
             bal_url=bal_url,
-            trans_url=trans_url
+            trans_url=trans_url,
             setting={
                 "init": True,
                 "paycheck_threshold": 200,
                 "catagory": {
                     "groceries": {"percent": 25, "balance": 0, "goal": 300},
-                    "fuel": {"percent": 25, "balance": 0, "goal": 300},
+                    "general": {"percent": 25, "balance": 0, "goal": 300},
                     "other": {"percent": 50, "balance": 0, "goal": 300},
                 },
             },
@@ -309,16 +310,16 @@ def update_acc_bal(acc, token, old_balance):
     url = acc.trans_url
     auth = HTTPBasicAuth(token, "")
     trans_info = requests.get(url, auth=auth).json()
-    print("printing ", trans_info)
+    # print("printing ", trans_info)
     # for each transaction query if
     for j in trans_info:
         trans_id = j["id"]
-        trans_value = j["amount"]
+        trans_value = Decimal(j["amount"])
         bank_id = j["account_id"]
         catagory = j["details"]["category"]
         descrip = j["description"]
-        counterparty = j["details"]["counterparty"]
-        print(catagory)
+        counterparty = j["details"]["counterparty"]["name"]
+        # print(catagory)
         transaction = Transaction.query.filter(
             Transaction.user_id == acc.user_id, Transaction.api_id == trans_id
         ).first()
@@ -336,7 +337,7 @@ def update_acc_bal(acc, token, old_balance):
                 user_id=acc.user_id,
                 account_id=acc.id,
                 transaction_catagory=catagory,
-                amount=trans_value,
+                amount=float(trans_value),
                 # account_id=bank_id,
                 api_id=trans_id,
                 counterparty=counterparty,
@@ -348,7 +349,7 @@ def update_acc_bal(acc, token, old_balance):
             db.session.commit()
 
             if (
-                trans_value >= acc.settings["paycheck_threshold"]
+                trans_value >= acc.setting["paycheck_threshold"]
                 and catagory == "income"
             ):
                 # create a log, reset catagory, update account and date
@@ -364,14 +365,29 @@ def update_acc_bal(acc, token, old_balance):
                 print("new paycheck")
                 acc.lastpaycheck_id = new_transaction.id
             else:
+                print("made it to else")
                 # take catagory and iterate through the setting, if the catagory is in settings add the balance to that catagory, if its not in setting
                 # add to "other" catagory
                 # extract keys from acc setting
-                set_catagories = list(acc.setting["catagory"].keys())
+                settings = acc.setting
+                set_catagories = list(settings["catagory"].keys())
+                # print(set_catagories)
                 if catagory in set_catagories:
-                    acc.setting["catagory"][catagory]["balance"] += trans_value * -1
+                    catagory_bal = Decimal(settings["catagory"][catagory]["balance"])
+                    print("in and adding", trans_value, " to ", catagory_bal)
+                    catagory_bal += trans_value
+                    settings["catagory"][catagory]["balance"] = float(catagory_bal)
+                    acc.settings = settings
+                    db.session.commit()
+
                 else:
-                    acc.setting["catagory"]["other"]["balance"] += trans_value * -1
+
+                    catagory_bal = Decimal(acc.setting["catagory"]["other"]["balance"])
+                    print("out adding", trans_value, " to ", catagory_bal)
+                    catagory_bal += trans_value
+                    settings["catagory"]["other"]["balance"] = float(catagory_bal)
+                    acc.setting = settings
+                    db.session.commit()
 
         db.session.commit()
 
