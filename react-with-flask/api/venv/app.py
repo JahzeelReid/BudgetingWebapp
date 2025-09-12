@@ -7,6 +7,7 @@ from sqlalchemy.orm import DeclarativeBase
 from sqlalchemy import JSON, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
 from decimal import Decimal
+from sqlalchemy.orm.attributes import flag_modified
 
 
 class Base(DeclarativeBase):
@@ -237,18 +238,15 @@ def full_update(user_id):
     url = "https://api.teller.io/accounts"
     accounts = requests.get(url, auth=auth).json()
     print("pulled from api")
-    for user1 in accounts:
-        if user1["type"] != "credit":
-            print(user1["last_four"])
 
     # Pulls the accounts we have on File. We will be comparing what we recieve to what we have
     user_accounts = Account.query.filter(Account.user_id == user_id).all()
-    print("pulled from database:")
+    # print("pulled from database:")
     database_last4 = []
     for user_account in user_accounts:
-        print(user_account.last_four)
+        # print(user_account.last_four)
         database_last4.append(user_account.last_four)
-    print("done pulling from db")
+    # print("done pulling from db")
     # For loop that iterate through every account we pull from api
     for i in range(len(accounts)):
         # As of now this is a debit account tracker so we exclude credit
@@ -266,10 +264,10 @@ def full_update(user_id):
         ######
 
         # check if account is in db
-        print("current", last4)
-        print("db_last4 array: ", database_last4)
+        # print("current", last4)
+        # print("db_last4 array: ", database_last4)
         if last4 in database_last4:
-            print(last4, " is in the db")
+            # print(last4, " is in the db")
             # we update
             # update the database
             #
@@ -337,7 +335,7 @@ def update_acc_bal(acc, token, old_balance):
                 user_id=acc.user_id,
                 account_id=acc.id,
                 transaction_catagory=catagory,
-                amount=float(trans_value),
+                amount=(trans_value),
                 # account_id=bank_id,
                 api_id=trans_id,
                 counterparty=counterparty,
@@ -375,19 +373,34 @@ def update_acc_bal(acc, token, old_balance):
                 if catagory in set_catagories:
                     catagory_bal = Decimal(settings["catagory"][catagory]["balance"])
                     print("in and adding", trans_value, " to ", catagory_bal)
-                    catagory_bal += trans_value
+                    catagory_bal = catagory_bal + trans_value
+                    print("new values = ", catagory_bal)
                     settings["catagory"][catagory]["balance"] = float(catagory_bal)
-                    acc.settings = settings
+                    print(
+                        "value in settings dict :",
+                        settings["catagory"][catagory]["balance"],
+                    )
+                    acc.setting = settings
+                    flag_modified(acc, "setting")
                     db.session.commit()
 
                 else:
 
                     catagory_bal = Decimal(acc.setting["catagory"]["other"]["balance"])
                     print("out adding", trans_value, " to ", catagory_bal)
-                    catagory_bal += trans_value
+                    catagory_bal = catagory_bal + trans_value
+                    print("new values = ", catagory_bal)
+
                     settings["catagory"]["other"]["balance"] = float(catagory_bal)
+                    print(
+                        "value in settings dict :",
+                        settings["catagory"]["other"]["balance"],
+                    )
+
                     acc.setting = settings
+                    flag_modified(acc, "setting")
                     db.session.commit()
+                    print("acc value: ", acc.setting["catagory"]["other"]["balance"])
 
         db.session.commit()
 

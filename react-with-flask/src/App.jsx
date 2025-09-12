@@ -1,8 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import axios from "axios";
 
-import reactLogo from "./assets/react.svg";
-import viteLogo from "/vite.svg";
 import "./App.css";
 // import SimpleTellerConnect from './Tellerbasic'
 // import TellerConnectClass from './Tellercomp'
@@ -107,27 +105,26 @@ function App() {
             </thead>
             <tbody>
               {response &&
-                response.users.map((user, index) => (
+                response?.users?.map((user, index) => (
                   <tr key={index}>
                     <td>{user.id}</td>
                     <td>{user.username}</td>
                     <td>
-                      {user.account[0].lastfour}, ${user.account[0].balance}
-                      {/* <table>
-                      <thead>
-                        <tr>
-                          <th>digits</th>
-                          <th>balance</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {user.account.settings.map((setting, index1) => (
-                          <tr key={index1}>
-                            <td>{setting.catagory}</td>
+                      <table>
+                        <thead>
+                          <tr>
+                            <th>digits</th>
+                            <th>balance</th>
+                          </tr>
+                        </thead>
+                        <tbody></tbody>
+                        {user.account.map((acc, index) => (
+                          <tr key={index}>
+                            <td>{acc.lastfour}</td>
+                            <td>{acc.balance}</td>
                           </tr>
                         ))}
-                      </tbody>
-                    </table> */}
+                      </table>
                     </td>
                   </tr>
                 ))}
