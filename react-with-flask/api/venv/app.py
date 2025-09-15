@@ -36,7 +36,7 @@ class User(db.Model):
     # with those bank acount links other info like transactions can be queried
     # tracks the date of the last query so that only data newer than that date is added, this prevents duplicate data from being added
     id: Mapped[int] = mapped_column(primary_key=True)
-    access_token: Mapped[str] = mapped_column(unique=True)
+    access_token: Mapped[str] = mapped_column(unique=True, nullable=True)
     username: Mapped[str] = mapped_column(unique=True)
     password: Mapped[str]
     # account_list: Mapped[list] = mapped_column(JSON, default=list, nullable=True)
@@ -112,6 +112,30 @@ def login():
         return jsonify({"message": "Login successful", "user_id": user.id}), 200
     else:
         return jsonify({"message": "Invalid username or password"}), 401
+
+@app.route("/signup", methods=["POST"])
+def signUp():
+    data = request.get_json()
+    username = data.get("username")
+    password = data.get("password")
+    user = User.query.filter_by(username=username).first()
+
+    if user:
+        print("Username already exists")
+        return jsonify({"message": "Username already exists"}), 401
+    else:
+        new_user = User(
+        access_token="init",
+        username=username,
+        password=password
+        # account_list=account_id_list,
+        # we will update this one after init
+    )
+    db.session.add(new_user)
+    db.session.flush()
+    db.session.commit()
+    
+    
 
 
 @app.route("/api/newuser", methods=["POST"])
