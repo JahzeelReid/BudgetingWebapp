@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import axios from "axios";
+import Page1 from "./page-1";
 
 import "./App.css";
 // import SimpleTellerConnect from './Tellerbasic'
@@ -16,9 +17,16 @@ function App() {
   const [response, setResponse] = useState(null);
   console.log("username Before open:", username);
   const usernameRef = useRef(username);
+
+  const handleValueFromChild = (value) => {
+    setUsername(value); // Update parent's state
+    console.log("Value received from child:", value);
+  };
+
   useEffect(() => {
     usernameRef.current = username; // update ref whenever state changes
   }, [username]);
+
   const { open, ready } = useTellerConnect({
     applicationId: app_id,
     environment: "sandbox",
@@ -89,9 +97,11 @@ function App() {
 
   return (
     <>
-      <div></div>
-      <h1>Test values</h1>
-      {logged_in ? (
+      <div>
+        <Page1 passValueUp={handleValueFromChild} />
+      </div>
+      <h1>app.jsx username = {username}</h1>
+      {/* {logged_in ? (
         <div>
           <h1>Here we go again</h1>
           <p>{username}</p>
@@ -145,9 +155,10 @@ function App() {
           >
             Connect a bank account
           </button>
-          {/* <p>Access values: {token} </p> */}
+          
         </div>
-      )}
+      )} 
+      */}
       <button onClick={toggleState}>Toggle</button>
       <div className="card"></div>
     </>

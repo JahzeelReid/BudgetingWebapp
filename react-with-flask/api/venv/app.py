@@ -100,6 +100,20 @@ def get_current_time():
     return {"time": time.time()}
 
 
+@app.route("/login", methods=["POST"])
+def login():
+    data = request.get_json()
+    username = data.get("username")
+    password = data.get("password")
+
+    user = User.query.filter_by(username=username).first()
+
+    if user and user.password == password:
+        return jsonify({"message": "Login successful", "user_id": user.id}), 200
+    else:
+        return jsonify({"message": "Invalid username or password"}), 401
+
+
 @app.route("/api/newuser", methods=["POST"])
 def init_user():
     # recieves the access token from the front end
