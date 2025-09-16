@@ -29,6 +29,38 @@ function App() {
     usernameRef.current = username; // update ref whenever state changes
   }, [username]);
 
+  useEffect(() => {
+    // if user id changes call the back end and query for an access token
+    // if there is not an access token run open()
+        axios({
+      method: "POST",
+      url: `/api/checkinit`,
+      data: {
+        user_id: user_id,
+      },
+    })
+      .then((response) => {
+        setResponse(response.data);
+        if (response.data.accesstoken == "init") {
+          setPage(2)
+          // page 2 should open
+          open()
+          // because we need to connect this account to teller
+        }
+        else {
+          // 
+        }
+        // setLoginIn(true);
+      })
+      .catch((error) => {
+        if (error.response) {
+          console.log(error.response);
+          console.log(error.response.status);
+          console.log(error.response.headers);
+        }
+      });
+  }, [user_id]);
+
   const { open, ready } = useTellerConnect({
     applicationId: app_id,
     environment: "sandbox",
