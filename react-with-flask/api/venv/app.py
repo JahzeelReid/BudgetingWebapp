@@ -113,6 +113,7 @@ def login():
     else:
         return jsonify({"message": "Invalid username or password"}), 401
 
+
 @app.route("/signup", methods=["POST"])
 def signUp():
     data = request.get_json()
@@ -125,17 +126,16 @@ def signUp():
         return jsonify({"message": "Username already exists"}), 401
     else:
         new_user = User(
-        access_token="init",
-        username=username,
-        password=password
-        # account_list=account_id_list,
-        # we will update this one after init
-    )
-    db.session.add(new_user)
-    db.session.flush()
-    db.session.commit()
-    
-    
+            access_token="init",
+            username=username,
+            password=password,
+            # account_list=account_id_list,
+            # we will update this one after init
+        )
+        db.session.add(new_user)
+        db.session.flush()
+        db.session.commit()
+        return jsonify({"message": "Signup successful", "user_id": new_user.id}), 200
 
 
 @app.route("/api/newuser", methods=["POST"])

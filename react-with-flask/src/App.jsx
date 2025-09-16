@@ -10,6 +10,8 @@ import { useTellerConnect } from "teller-connect-react";
 
 function App() {
   const [logged_in, setLoginIn] = useState(false);
+  const [page, setPage] = useState(1);
+  const [user_id, setUserID] = useState("");
   //   const [token, setToken] = useState();
   const [username, setUsername] = useState("");
   const [value, setvalue] = useState("");

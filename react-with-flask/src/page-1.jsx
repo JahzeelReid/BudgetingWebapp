@@ -12,13 +12,39 @@ function Page1(props) {
   const [accessToken, setAccessToken] = useState(null);
   const [response, setResponse] = useState(null);
 
-  const handleClick = () => {
+  const handlelogin = () => {
     // on click send post request to backend with username and password
     // will receive back a user id
     // pass user id back to app.jsx
     axios({
       method: "POST",
       url: `/login`,
+      data: {
+        // auth: accesstoken,
+        username: username,
+        password: password,
+      },
+    })
+      .then((response) => {
+        setResponse(response.data);
+        // setLoginIn(true);
+      })
+      .catch((error) => {
+        if (error.response) {
+          console.log(error.response);
+          console.log(error.response.status);
+          console.log(error.response.headers);
+        }
+      });
+    props.passValueUp(username); // Call the parent's function
+  };
+  const handlesignup = () => {
+    // on click send post request to backend with username and password
+    // will receive back a user id
+    // pass user id back to app.jsx
+    axios({
+      method: "POST",
+      url: `/signup`,
       data: {
         // auth: accesstoken,
         username: username,
@@ -65,7 +91,8 @@ function Page1(props) {
           onChange={(e) => setPassword(e.target.value)}
         />
         <p>page-1.jsx username = {username}</p>
-        <button onClick={handleClick}>Submit</button>
+        <button onClick={handlelogin}>Submit</button>
+        <button onClick={handlesignup}>Sign up</button>
       </Box>
 
       <h1>Welcome to Page 1</h1>
