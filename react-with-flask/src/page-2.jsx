@@ -61,7 +61,7 @@ function Page2(props) {
   useEffect(() => {
     
     updateaccesstoken()
-  }, []);
+  }, [accesstoken]);
   
   
   return (<div>teller connect lol</div>)
