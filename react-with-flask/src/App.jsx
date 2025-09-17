@@ -23,7 +23,11 @@ function App() {
   const handleValueFromChild = (value) => {
     setUsername(value); // Update parent's state
     console.log("Value received from child:", value);
-  };
+  }; 
+
+  const changepage = (value) => {
+    setPage(value);
+  }
 
   useEffect(() => {
     usernameRef.current = username; // update ref whenever state changes
@@ -133,6 +137,7 @@ function App() {
     <>
       <div>
         <Page1 passValueUp={handleValueFromChild} />
+        <Page2 changepage={changepage} />
       </div>
       <h1>app.jsx username = {username}</h1>
       {/* {logged_in ? (
