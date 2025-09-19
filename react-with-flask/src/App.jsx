@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import axios from "axios";
 import Page1 from "./page-1";
+import Page2 from "./page-2";
 
 import "./App.css";
 // import SimpleTellerConnect from './Tellerbasic'
@@ -23,11 +24,11 @@ function App() {
   const handleValueFromChild = (value) => {
     setUsername(value); // Update parent's state
     console.log("Value received from child:", value);
-  }; 
+  };
 
   const changepage = (value) => {
     setPage(value);
-  }
+  };
 
   useEffect(() => {
     usernameRef.current = username; // update ref whenever state changes
@@ -36,7 +37,7 @@ function App() {
   useEffect(() => {
     // if user id changes call the back end and query for an access token
     // if there is not an access token run open()
-        axios({
+    axios({
       method: "POST",
       url: `/api/checkinit`,
       data: {
@@ -46,13 +47,12 @@ function App() {
       .then((response) => {
         setResponse(response.data);
         if (response.data.accesstoken == "init") {
-          setPage(2)
+          setPage(2);
           // page 2 should open
-          open()
+          open();
           // because we need to connect this account to teller
-        }
-        else {
-          // 
+        } else {
+          //
         }
         // setLoginIn(true);
       })
@@ -113,22 +113,6 @@ function App() {
       });
   }
 
-  function pullallusers() {
-    axios({
-      method: "GET",
-      url: `/api/getusers`,
-    })
-      .then((response) => {
-        setResponse(response.data);
-      })
-      .catch((error) => {
-        if (error.response) {
-          console.log(error.response);
-          console.log(error.response.status);
-          console.log(error.response.headers);
-        }
-      });
-  }
   const toggleState = () => {
     setLoginIn((prev) => !prev);
   };
@@ -140,64 +124,7 @@ function App() {
         <Page2 changepage={changepage} />
       </div>
       <h1>app.jsx username = {username}</h1>
-      {/* {logged_in ? (
-        <div>
-          <h1>Here we go again</h1>
-          <p>{username}</p>
-          <table>
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>User</th>
-                <th>token</th>
-              </tr>
-            </thead>
-            <tbody>
-              {response &&
-                response?.users?.map((user, index) => (
-                  <tr key={index}>
-                    <td>{user.id}</td>
-                    <td>{user.username}</td>
-                    <td>
-                      <table>
-                        <thead>
-                          <tr>
-                            <th>digits</th>
-                            <th>balance</th>
-                          </tr>
-                        </thead>
-                        <tbody></tbody>
-                        {user.account.map((acc, index) => (
-                          <tr key={index}>
-                            <td>{acc.lastfour}</td>
-                            <td>{acc.balance}</td>
-                          </tr>
-                        ))}
-                      </table>
-                    </td>
-                  </tr>
-                ))}
-            </tbody>
-          </table>
-        </div>
-      ) : (
-        <div>
-          <p>{username}</p>
-          <input onChange={(e) => setUsername(e.target.value)} />
-          <button
-            onClick={() => {
-              setvalue(username);
-              console.log(value);
-              open();
-            }}
-            disabled={!ready}
-          >
-            Connect a bank account
-          </button>
-          
-        </div>
-      )} 
-      */}
+
       <button onClick={toggleState}>Toggle</button>
       <div className="card"></div>
     </>

@@ -138,6 +138,22 @@ def signUp():
         return jsonify({"message": "Signup successful", "user_id": new_user.id}), 200
 
 
+@app.route("/updateaccess", methods=["POST"])
+def update_access():
+    data = request.get_json()
+    user_id = data.get("user_id")
+    access_token = data.get("access_token")
+
+    user = User.query.filter_by(id=user_id).first()
+
+    if user:
+        user.access_token = access_token
+        db.session.commit()
+        return jsonify({"message": "Access token updated successfully"}), 200
+    else:
+        return jsonify({"message": "User not found"}), 404
+
+
 @app.route("/api/newuser", methods=["POST"])
 def init_user():
     # recieves the access token from the front end
