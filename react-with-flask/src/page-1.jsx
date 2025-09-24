@@ -27,16 +27,19 @@ function Page1(props) {
     })
       .then((response) => {
         setResponse(response.data);
+        props.returnUsername(username); // Call the parent's function
+        props.returnId(response.user_id)
         // setLoginIn(true);
       })
       .catch((error) => {
         if (error.response) {
+          alert("incorrect login")
           console.log(error.response);
           console.log(error.response.status);
           console.log(error.response.headers);
         }
       });
-    props.passValueUp(username); // Call the parent's function
+    
   };
   const handlesignup = () => {
     // on click send post request to backend with username and password
@@ -53,10 +56,12 @@ function Page1(props) {
     })
       .then((response) => {
         setResponse(response.data);
+        alert("login added, welcome ;)")
         // setLoginIn(true);
       })
       .catch((error) => {
         if (error.response) {
+          alert("username not available");
           console.log(error.response);
           console.log(error.response.status);
           console.log(error.response.headers);
