@@ -1,27 +1,27 @@
 import { useState, useEffect, useRef } from "react";
 import axios from "axios";
 import Page1 from "./page-1";
+// Page1 handles Sign ins and ups
 import Page2 from "./page-2";
+// Page2 only runs teller connect
+import Page3 from "./page-3";
+// page3 is our main page
 
 import "./App.css";
-// import SimpleTellerConnect from './Tellerbasic'
-// import TellerConnectClass from './Tellercomp'
-// import { TellerConnect } from 'teller-connect-react';
 import { useTellerConnect } from "teller-connect-react";
 
 function App() {
-  const [logged_in, setLoginIn] = useState(false);
   const [page, setPage] = useState(1);
-  const [user_id, setUserID] = useState("");
-  //   const [token, setToken] = useState();
-  const [username, setUsername] = useState("");
-  const [value, setvalue] = useState("");
+  // we need page to mark which components to render
+  const [user_id, setUserID] = useState();
+  // const [username, setUsername] = useState("");
+  // const [value, setvalue] = useState("");
   const app_id = "app_ph83hsn3hg9ukkife2000";
   const [response, setResponse] = useState(null);
   console.log("username Before open:", username);
   const usernameRef = useRef(username);
 
-  const handleValueFromChild = (value) => {
+  const handleUsernameFromPage1 = (value) => {
     setUsername(value); // Update parent's state
     console.log("Value received from child:", value);
   };
@@ -49,7 +49,7 @@ function App() {
         if (response.data.accesstoken == "init") {
           setPage(2);
           // page 2 should open
-          open();
+          // open();
           // because we need to connect this account to teller
         } else {
           //
@@ -79,9 +79,9 @@ function App() {
     },
   });
 
-  useEffect(() => {
-    pullallusers();
-  }, [logged_in]);
+  // useEffect(() => {
+  //   pullallusers();
+  // }, [logged_in]);
 
   function getclientlist(accesstoken, uname) {
     console.log("sending uname param:", uname);
@@ -116,19 +116,40 @@ function App() {
   const toggleState = () => {
     setLoginIn((prev) => !prev);
   };
-
-  return (
-    <>
+  if (page == 1) {
+    return(
       <div>
-        <Page1 passValueUp={handleValueFromChild} />
+        <Page1 returnUsername={handleUsernameFromPage1} changepage={changepage}/>
+      </div>
+    );
+  } else if (page == 2) {
+    return(
+      <div>
         <Page2 changepage={changepage} />
       </div>
-      <h1>app.jsx username = {username}</h1>
+    );
+    
+  } else if (page == 3) {
+    return (
+      <div>
+        <Page3 changepage={changepage} />
+      </div>
+    );
+    
+  } else {
+    return (
+      <>
+        
+        <h1>app.jsx username = {username}</h1>
+        <h1>Unauth Page</h1>
+        <button onClick={toggleState}>Toggle</button>
+        <div className="card"></div>
+      </>
+    );
+    
+  }
 
-      <button onClick={toggleState}>Toggle</button>
-      <div className="card"></div>
-    </>
-  );
+  
 }
 
 export default App;
