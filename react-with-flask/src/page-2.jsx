@@ -2,6 +2,8 @@ import React from "react";
 import Box from "@mui/material/Box";
 import TextField from "@mui/material/TextField";
 import { useState, useEffect, useRef } from "react";
+import { useTellerConnect } from "teller-connect-react";
+import axios from "axios";
 
 function Page2(props) {
   // this component follows page the login page
@@ -10,6 +12,7 @@ function Page2(props) {
   // should send the new access code to the db
   // props.user_id
   const [accesstoken, setAccesstoken] = useState("");
+  const app_id = "app_ph83hsn3hg9ukkife2000";
 
   const { open, ready } = useTellerConnect({
     applicationId: app_id,

@@ -18,8 +18,8 @@ function App() {
   // const [value, setvalue] = useState("");
   const app_id = "app_ph83hsn3hg9ukkife2000";
   const [response, setResponse] = useState(null);
-  console.log("username Before open:", username);
-  const usernameRef = useRef(username);
+  // console.log("username Before open:", username);
+  // const usernameRef = useRef(username);
 
   const handleUsernameFromPage1 = (value) => {
     setUsername(value); // Update parent's state
@@ -30,9 +30,9 @@ function App() {
     setPage(value);
   };
 
-  useEffect(() => {
-    usernameRef.current = username; // update ref whenever state changes
-  }, [username]);
+  // useEffect(() => {
+  //   usernameRef.current = username; // update ref whenever state changes
+  // }, [username]);
 
   useEffect(() => {
     // if user id changes call the back end and query for an access token
@@ -117,39 +117,36 @@ function App() {
     setLoginIn((prev) => !prev);
   };
   if (page == 1) {
-    return(
+    return (
       <div>
-        <Page1 returnUsername={handleUsernameFromPage1} changepage={changepage}/>
+        <Page1
+          returnUsername={handleUsernameFromPage1}
+          changepage={changepage}
+        />
       </div>
     );
   } else if (page == 2) {
-    return(
+    return (
       <div>
         <Page2 changepage={changepage} />
       </div>
     );
-    
   } else if (page == 3) {
     return (
       <div>
         <Page3 changepage={changepage} />
       </div>
     );
-    
   } else {
     return (
       <>
-        
-        <h1>app.jsx username = {username}</h1>
+        {/* <h1>app.jsx username = {username}</h1> */}
         <h1>Unauth Page</h1>
         <button onClick={toggleState}>Toggle</button>
         <div className="card"></div>
       </>
     );
-    
   }
-
-  
 }
 
 export default App;

@@ -2,6 +2,7 @@ import React from "react";
 import Box from "@mui/material/Box";
 import TextField from "@mui/material/TextField";
 import { useState, useEffect, useRef } from "react";
+import axios from "axios";
 
 function Page1(props) {
   // this component will be the first page of the budgeting web app
@@ -28,18 +29,17 @@ function Page1(props) {
       .then((response) => {
         setResponse(response.data);
         props.returnUsername(username); // Call the parent's function
-        props.returnId(response.user_id)
+        props.returnId(response.user_id);
         // setLoginIn(true);
       })
       .catch((error) => {
         if (error.response) {
-          alert("incorrect login")
+          alert("incorrect login");
           console.log(error.response);
           console.log(error.response.status);
           console.log(error.response.headers);
         }
       });
-    
   };
   const handlesignup = () => {
     // on click send post request to backend with username and password
@@ -56,7 +56,7 @@ function Page1(props) {
     })
       .then((response) => {
         setResponse(response.data);
-        alert("login added, welcome ;)")
+        alert("login added, welcome ;)");
         // setLoginIn(true);
       })
       .catch((error) => {
