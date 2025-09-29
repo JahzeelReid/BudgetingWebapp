@@ -46,12 +46,13 @@ function App() {
     })
       .then((response) => {
         setResponse(response.data);
-        if (response.data.accesstoken == "init") {
+        if (response.data.accesstoken == False) {
           setPage(2);
           // page 2 should open
           // open();
           // because we need to connect this account to teller
         } else {
+          setPage(3);
           //
         }
         // setLoginIn(true);
