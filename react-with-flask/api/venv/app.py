@@ -100,7 +100,7 @@ def get_current_time():
     return {"time": time.time()}
 
 
-@app.route("/login", methods=["POST"])
+@app.route("/api/login", methods=["POST"])
 def login():
     data = request.get_json()
     username = data.get("username")
@@ -109,16 +109,18 @@ def login():
     user = User.query.filter_by(username=username).first()
 
     if user and user.password == password:
+        print("logged in user ", user.id)
         return jsonify({"message": "Login successful", "user_id": user.id}), 200
     else:
         return jsonify({"message": "Invalid username or password"}), 401
 
 
-@app.route("/signup", methods=["POST"])
+@app.route("/api/signup", methods=["POST"])
 def signUp():
     data = request.get_json()
     username = data.get("username")
     password = data.get("password")
+    print("recived data: ", username, " - ", password)
     user = User.query.filter_by(username=username).first()
 
     if user:
@@ -137,30 +139,48 @@ def signUp():
         db.session.commit()
         return jsonify({"message": "Signup successful", "user_id": new_user.id}), 200
 
+
 @app.route("/api/checkinit", methods=["POST"])
 def check_init_status():
     data = request.get_json()
     user_id = data.get("user_id")
+    print("checkinit user_id: ", user_id)
 
     user = User.query.filter_by(id=user_id).first()
     if user:
         # check is access token is populated
         if user.access_token == "init":
             # this has not been initialized
-            return jsonify({"message": "Access token not found, proceed to teller connect", "accesstoken": False}), 200
+            return (
+                jsonify(
+                    {
+                        "message": "Access token not found, proceed to teller connect",
+                        "accesstoken": False,
+                    }
+                ),
+                200,
+            )
         else:
-            return jsonify({"message": "Access token Found, proceed to dashboard", "accesstoken": True }), 200
+            return (
+                jsonify(
+                    {
+                        "message": "Access token Found, proceed to dashboard",
+                        "accesstoken": True,
+                    }
+                ),
+                200,
+            )
     else:
         return jsonify({"message": "User not found"}), 404
-    
 
 
-
-@app.route("/updateaccess", methods=["POST"])
+@app.route("/api/updateaccess", methods=["POST"])
 def update_access():
     data = request.get_json()
     user_id = data.get("user_id")
     access_token = data.get("access_token")
+    print("updateaccess user_id: ", user_id, "and new token: ", access_token)
+    user = User.query.filter_by(id=user_id).first()
 
     if user:
         user.access_token = access_token

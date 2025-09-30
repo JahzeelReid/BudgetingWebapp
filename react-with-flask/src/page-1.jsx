@@ -19,7 +19,7 @@ function Page1(props) {
     // pass user id back to app.jsx
     axios({
       method: "POST",
-      url: `/login`,
+      url: `/api/login`,
       data: {
         // auth: accesstoken,
         username: username,
@@ -28,8 +28,8 @@ function Page1(props) {
     })
       .then((response) => {
         setResponse(response.data);
-        props.returnUsername(username); // Call the parent's function
-        props.returnId(response.user_id);
+        // props.returnUsername(username); // Call the parent's function
+        props.returnId(response.data.user_id);
         // setLoginIn(true);
       })
       .catch((error) => {
@@ -41,13 +41,14 @@ function Page1(props) {
         }
       });
   };
+
   const handlesignup = () => {
     // on click send post request to backend with username and password
     // will receive back a user id
     // pass user id back to app.jsx
     axios({
       method: "POST",
-      url: `/signup`,
+      url: `/api/signup`,
       data: {
         // auth: accesstoken,
         username: username,
@@ -61,13 +62,13 @@ function Page1(props) {
       })
       .catch((error) => {
         if (error.response) {
-          alert("username not available");
+          // alert("username not available");
           console.log(error.response);
           console.log(error.response.status);
           console.log(error.response.headers);
         }
       });
-    props.passValueUp(username); // Call the parent's function
+    // props.passValueUp(username); // Call the parent's function
   };
 
   return (

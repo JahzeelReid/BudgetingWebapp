@@ -30,6 +30,11 @@ function App() {
     setPage(value);
   };
 
+  const handleIdFromPage1 = (value) => {
+    setUserID(value); // Update parent's state
+    console.log("Value received from child:", value);
+  };
+
   // useEffect(() => {
   //   usernameRef.current = username; // update ref whenever state changes
   // }, [username]);
@@ -46,7 +51,7 @@ function App() {
     })
       .then((response) => {
         setResponse(response.data);
-        if (response.data.accesstoken == False) {
+        if (response.data.accesstoken === false) {
           setPage(2);
           // page 2 should open
           // open();
@@ -120,8 +125,12 @@ function App() {
   if (page == 1) {
     return (
       <div>
+        <p>userId is {user_id}</p>
+        <p> this should change after i sign in</p>
+        {/* <p>Ig username too: {username} </p> */}
         <Page1
           returnUsername={handleUsernameFromPage1}
+          returnId={handleIdFromPage1}
           changepage={changepage}
         />
       </div>
@@ -129,13 +138,15 @@ function App() {
   } else if (page == 2) {
     return (
       <div>
-        <Page2 changepage={changepage} />
+        <p>userId is {user_id}</p>
+        <p> this should persist on page 2</p>
+        <Page2 changepage={changepage} user_id={user_id} />
       </div>
     );
   } else if (page == 3) {
     return (
       <div>
-        <Page3 changepage={changepage} />
+        <Page3 changepage={changepage} user_id={user_id} />
       </div>
     );
   } else {

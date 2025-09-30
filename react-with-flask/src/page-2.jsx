@@ -20,9 +20,10 @@ function Page2(props) {
     onSuccess: (authorization) => {
       // Save your access token here
       console.log("Sandbox Access Token:", authorization.accessToken);
-      console.log("username at onSuccess:", username);
+      console.log("user_id at onSuccess:", props.user_id);
       // getclientlist(authorization, usernameRef.current);
       setAccesstoken(authorization.accessToken);
+      updateaccesstoken();
 
       // send to api
       // token = authorization.accessToken;
@@ -33,7 +34,7 @@ function Page2(props) {
   function updateaccesstoken() {
     axios({
       method: "POST",
-      url: `/updateaccess`,
+      url: `/api/updateaccess`,
       data: {
         user_id: props.user_id,
         access_token: accesstoken,
@@ -62,7 +63,22 @@ function Page2(props) {
     updateaccesstoken();
   }, [accesstoken]);
 
-  return <div>teller connect lol</div>;
+  return (
+    <>
+      <div>
+        <p>Click this button if teller connect doesn show up</p>
+        <button onClick={() => open()} disabled={!ready}>
+          Connect with Teller
+        </button>
+      </div>
+      <div>
+        <p>After you link your account we will redirect you</p>
+        <p>to the user list page</p>
+        <p>if you are not redirected please click the button below</p>
+        {/* <button onClick={() => updateaccesstoken()}>Continue</button> */}
+      </div>
+    </>
+  );
 }
 
 export default Page2;

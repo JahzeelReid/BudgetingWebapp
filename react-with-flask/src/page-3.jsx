@@ -2,7 +2,6 @@ import React from "react";
 import Box from "@mui/material/Box";
 import TextField from "@mui/material/TextField";
 import { useState, useEffect, useRef } from "react";
-import { useTellerConnect } from "teller-connect-react";
 
 import axios from "axios";
 
@@ -26,9 +25,9 @@ function Page3(props) {
       });
   }
 
-  useEffect(() => {
-    pullallusers();
-  }, []);
+  // useEffect(() => {
+  //   pullallusers();
+  // }, []);
 
   return (
     <div>
