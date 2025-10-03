@@ -312,6 +312,38 @@ def getusers():
     return prod
 
 
+@app.route("/api/dashboard_accounts", methods=["POST"])
+def get_dashboard_accounts():
+    data = request.get_json()
+    user_id = data.get("user_id")
+    print("get_dashboard_accounts user_id: ", user_id)
+
+    user = User.query.filter_by(id=user_id).first()
+    if user:
+        # full_update(user.id)
+        accounts = Account.query.filter(Account.user_id == user.id).all()
+        accountlist = []
+        for account in accounts:
+            accountlist.append(
+                {
+                    "lastfour": account.last_four,
+                    "balance": account.current_bal,
+                    "settings": account.setting,
+                }
+            )
+        return (
+            jsonify(
+                {
+                    "message": "Accounts retrieved successfully",
+                    "accounts": accountlist,
+                }
+            ),
+            200,
+        )
+    else:
+        return jsonify({"message": "User not found"}), 404
+
+
 def full_update(user_id):
     # Inputs: user_id | we use this to identify the accounts that will be updated
     # output: 404 | if the user doesn't exist in db
@@ -324,10 +356,12 @@ def full_update(user_id):
     # Pulls the access token stored on DB
     token = user.access_token
     # Pulls all related accounts from the api
+    print("token:", token)
     auth = HTTPBasicAuth(token, "")
     url = "https://api.teller.io/accounts"
     accounts = requests.get(url, auth=auth).json()
-    print("pulled from api")
+    # print("pulled from api")
+    print(accounts)
 
     # Pulls the accounts we have on File. We will be comparing what we recieve to what we have
     user_accounts = Account.query.filter(Account.user_id == user_id).all()
@@ -340,6 +374,7 @@ def full_update(user_id):
     # For loop that iterate through every account we pull from api
     for i in range(len(accounts)):
         # As of now this is a debit account tracker so we exclude credit
+
         if accounts[i]["type"] == "credit":
             continue
 
@@ -348,8 +383,9 @@ def full_update(user_id):
         # we use last 4 to identify
         last4 = accounts[i]["last_four"]
         # calls the balance for account so we can update our db
-        url = accounts[i]["links"]["balances"]
-        bal_info = requests.get(url, auth=auth)
+        bal_url = accounts[i]["links"]["balances"]
+        trans_url = accounts[i]["links"]["transactions"]
+        bal_info = requests.get(bal_url, auth=auth)
         account_bal = bal_info.json()["available"]
         ######
 
@@ -377,8 +413,17 @@ def full_update(user_id):
                 user_id=user.id,
                 current_bal=account_bal,
                 last_four=last4,
-                url=url,
-                setting={"init": False},
+                bal_url=bal_url,
+                trans_url=trans_url,
+                setting={
+                    "init": False,
+                    "paycheck_threshold": 200,
+                    "catagory": {
+                        "groceries": {"percent": 25, "balance": 0, "goal": 300},
+                        "general": {"percent": 25, "balance": 0, "goal": 300},
+                        "other": {"percent": 50, "balance": 0, "goal": 300},
+                    },
+                },
             )
             db.session.add(new_acc)
             db.session.commit()

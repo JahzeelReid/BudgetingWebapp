@@ -11,7 +11,7 @@ function Page2(props) {
   // should host teller connect and run open() on start up
   // should send the new access code to the db
   // props.user_id
-  const [accesstoken, setAccesstoken] = useState("");
+  const [accesstoken, setAccesstoken] = useState();
   const app_id = "app_ph83hsn3hg9ukkife2000";
 
   const { open, ready } = useTellerConnect({
@@ -32,26 +32,28 @@ function Page2(props) {
   });
 
   function updateaccesstoken() {
-    axios({
-      method: "POST",
-      url: `/api/updateaccess`,
-      data: {
-        user_id: props.user_id,
-        access_token: accesstoken,
-      },
-    })
-      .then((response) => {
-        // setResponse(response.data);
-        props.changepage(3);
-        // setLoginIn(true);
+    if (accesstoken) {
+      axios({
+        method: "POST",
+        url: `/api/updateaccess`,
+        data: {
+          user_id: props.user_id,
+          access_token: accesstoken,
+        },
       })
-      .catch((error) => {
-        if (error.response) {
-          console.log(error.response);
-          console.log(error.response.status);
-          console.log(error.response.headers);
-        }
-      });
+        .then((response) => {
+          // setResponse(response.data);
+          props.changepage(3);
+          // setLoginIn(true);
+        })
+        .catch((error) => {
+          if (error.response) {
+            console.log(error.response);
+            console.log(error.response.status);
+            console.log(error.response.headers);
+          }
+        });
+    }
   }
 
   useEffect(() => {
