@@ -320,7 +320,7 @@ def get_dashboard_accounts():
 
     user = User.query.filter_by(id=user_id).first()
     if user:
-        # full_update(user.id)
+        full_update(user.id)
         accounts = Account.query.filter(Account.user_id == user.id).all()
         accountlist = []
         for account in accounts:
@@ -361,7 +361,7 @@ def full_update(user_id):
     url = "https://api.teller.io/accounts"
     accounts = requests.get(url, auth=auth).json()
     # print("pulled from api")
-    print(accounts)
+    # print(accounts)
 
     # Pulls the accounts we have on File. We will be comparing what we recieve to what we have
     user_accounts = Account.query.filter(Account.user_id == user_id).all()
@@ -382,6 +382,7 @@ def full_update(user_id):
         # Grabs identifying info from api pulled accounts
         # we use last 4 to identify
         last4 = accounts[i]["last_four"]
+        print("We are on account with last 4: ", last4)
         # calls the balance for account so we can update our db
         bal_url = accounts[i]["links"]["balances"]
         trans_url = accounts[i]["links"]["transactions"]
@@ -409,24 +410,31 @@ def full_update(user_id):
         else:
             # If false, the account we pulled from api is new and need to be initialized
             # NOT DONE NEEDS WORK
-            new_acc = Account(
-                user_id=user.id,
-                current_bal=account_bal,
-                last_four=last4,
-                bal_url=bal_url,
-                trans_url=trans_url,
-                setting={
-                    "init": False,
-                    "paycheck_threshold": 200,
-                    "catagory": {
-                        "groceries": {"percent": 25, "balance": 0, "goal": 300},
-                        "general": {"percent": 25, "balance": 0, "goal": 300},
-                        "other": {"percent": 50, "balance": 0, "goal": 300},
+            print(last4, " is NOT in the db, adding")
+            testacc = Account.query.filter(
+                Account.user_id == user_id, Account.last_four == last4
+            ).first()
+            if not testacc:
+
+                new_acc = Account(
+                    user_id=user.id,
+                    current_bal=account_bal,
+                    last_four=last4,
+                    bal_url=bal_url,
+                    trans_url=trans_url,
+                    setting={
+                        "init": False,
+                        "paycheck_threshold": 200,
+                        # "catagory": {
+                        #     "groceries": {"percent": 25, "balance": 0, "goal": 300},
+                        #     "general": {"percent": 25, "balance": 0, "goal": 300},
+                        #     "other": {"percent": 50, "balance": 0, "goal": 300},
+                        # },
                     },
-                },
-            )
-            db.session.add(new_acc)
-            db.session.commit()
+                )
+                db.session.add(new_acc)
+                db.session.flush()
+                db.session.commit()
 
 
 def update_acc_bal(acc, token, old_balance):

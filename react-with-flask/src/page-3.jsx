@@ -12,9 +12,11 @@ import {
   Typography,
   CircularProgress,
 } from "@mui/material";
+import Page4 from "./page-4";
 
 function Page3(props) {
   // Props: user_id, changepage
+  // on click we should go to page 4
   const [accounts, setAccounts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [userData, setUserData] = useState(null);
@@ -74,6 +76,7 @@ function Page3(props) {
             <Card>
               <CardActionArea
               // onClick={() => onAccountClick && onAccountClick(account)}
+              // on click send the account id back to base and change to page 4 is init page 5 if not
               >
                 <CardContent>
                   <Typography variant="h6">
@@ -84,10 +87,18 @@ function Page3(props) {
                   </Typography>
                   <Typography variant="body2" mt={1}>
                     Envelopes:{" "}
-                    {/* {account.envelopes && account.envelopes.length > 0
-                        ? account.envelopes.join(", ")
-                        : "None"} */}
                   </Typography>
+                  {account.settings.init ? (
+                    Object.entries(account.settings.catagory).map(
+                      ([title, details], index) => (
+                        <Typography key={index}>
+                          {title}: ${details.balance.toFixed(2)}
+                        </Typography>
+                      )
+                    )
+                  ) : (
+                    <p>Please click to initialize</p>
+                  )}
                 </CardContent>
               </CardActionArea>
             </Card>

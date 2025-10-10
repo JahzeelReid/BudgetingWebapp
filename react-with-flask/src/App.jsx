@@ -6,6 +6,7 @@ import Page2 from "./page-2";
 // Page2 only runs teller connect
 import Page3 from "./page-3";
 // page3 is our main page
+import Page4 from "./page-4";
 
 import "./App.css";
 import { useTellerConnect } from "teller-connect-react";
@@ -20,6 +21,7 @@ function App() {
   const [response, setResponse] = useState(null);
   // console.log("username Before open:", username);
   // const usernameRef = useRef(username);
+  const [acc_id, setAccID] = useState(null);
 
   const handleUsernameFromPage1 = (value) => {
     setUsername(value); // Update parent's state
@@ -28,6 +30,10 @@ function App() {
 
   const changepage = (value) => {
     setPage(value);
+  };
+
+  const changeacc = (value) => {
+    setAccID(value);
   };
 
   const handleIdFromPage1 = (value) => {
@@ -146,7 +152,17 @@ function App() {
   } else if (page == 3) {
     return (
       <div>
-        <Page3 changepage={changepage} user_id={user_id} />
+        <Page3
+          changepage={changepage}
+          user_id={user_id}
+          changeacc={changeacc}
+        />
+      </div>
+    );
+  } else if (page == 4) {
+    return (
+      <div>
+        <Page4 changepage={changepage} user_id={user_id} acc_id={acc_id} />
       </div>
     );
   } else {
