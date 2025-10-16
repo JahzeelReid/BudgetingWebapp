@@ -13,16 +13,9 @@ import {
   TextField,
   Checkbox,
   FormControlLabel,
+  FormGroup,
 } from "@mui/material";
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
-
-const data = [
-  { name: "Mortgage", value: 30 },
-  { name: "Rent", value: 20 },
-  { name: "Fun", value: 15 },
-  { name: "Grocery", value: 25 },
-  { name: "Bill", value: 10 },
-];
 
 const COLORS = ["#0D47A1", "#1976D2", "#42A5F5", "#64B5F6", "#90CAF9"];
 
@@ -31,6 +24,54 @@ function Page4(props) {
   // this will be the setting page that allows the user to set up envelopes for each account
   // this will only work if the account has init
   // on submit sends a post request to /api/newsettings
+  const data = [
+    { name: "Mortgage", value: 30 },
+    { name: "Rent", value: 20 },
+    { name: "Fun", value: 15 },
+    { name: "Grocery", value: 25 },
+    { name: "Bill", value: 10 },
+  ];
+
+  const categories = [
+    { name: "Mortgage", value: 30 },
+    { name: "Rent", value: 20 },
+    { name: "Fun", value: 15 },
+    { name: "Grocery", value: 25 },
+    { name: "Bill", value: 10 },
+  ];
+  const [selectedCategories, setSelectedCategories] = useState([]);
+
+  const handleCheckboxChange = (category) => {
+    setSelectedCategories((prev) => {
+      const exists = prev.find((item) => item.name === category.name);
+      if (exists) {
+        // Remove if already selected
+        return prev.filter((item) => item.name !== category.name);
+      } else {
+        // Add if not already selected
+        return [...prev, category];
+      }
+    });
+  };
+
+  const handleValueChange = (name, newValue) => {
+    setSelectedCategories((prev) =>
+      prev.map((item) =>
+        item.name === name
+          ? { ...item, value: parseFloat(newValue) || 0 }
+          : item
+      )
+    );
+  };
+
+  const isChecked = (name) =>
+    selectedCategories.some((item) => item.name === name);
+
+  const getValue = (name) => {
+    const found = selectedCategories.find((item) => item.name === name);
+    return found ? found.value : "";
+  };
+
   return (
     <Box
       sx={{
@@ -94,9 +135,9 @@ function Page4(props) {
           <Card sx={{ bgcolor: "#78909C", color: "white", mb: 3 }}>
             <CardContent>
               <Typography>
-                Last Paycheck Total: <strong>$1981</strong>
+                Last Paycheck Total: <strong>$NULL</strong>
               </Typography>
-              <Typography>08/30/25</Typography>
+              <Typography>NULL</Typography>
             </CardContent>
           </Card>
 
@@ -141,6 +182,27 @@ function Page4(props) {
                 />
               ))}
 
+              <FormGroup>
+                {/* put blank nec to it that lets you change the value */}
+                {categories.map((category) => (
+                  <FormControlLabel
+                    key={category.name}
+                    control={
+                      <Checkbox
+                        checked={selectedCategories.some(
+                          (item) => item.name === category.name
+                        )}
+                        onChange={() => handleCheckboxChange(category)}
+                      />
+                    }
+                    label={category.name}
+                  />
+                ))}
+              </FormGroup>
+
+              <h4>Selected Data:</h4>
+              <pre>{JSON.stringify(selectedCategories, null, 2)}</pre>
+
               <Typography mt={1}>
                 Custom Categories: Add(+) Delete(-)
               </Typography>
@@ -149,7 +211,7 @@ function Page4(props) {
                 label="Gas __%"
               />
 
-              <Typography mt={2}>Total: 100%</Typography>
+              <Typography mt={2}>Total: NULL%</Typography>
 
               <Button
                 variant="contained"

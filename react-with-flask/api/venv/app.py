@@ -269,14 +269,18 @@ def init_user():
             last_four=four_digits,
             bal_url=bal_url,
             trans_url=trans_url,
+            # setting={
+            #     "init": True,
+            #     "paycheck_threshold": 200,
+            #     "catagory": {
+            #         "groceries": {"percent": 25, "balance": 0, "goal": 300},
+            #         "general": {"percent": 25, "balance": 0, "goal": 300},
+            #         "other": {"percent": 50, "balance": 0, "goal": 300},
+            #     },
+            # },
             setting={
-                "init": True,
+                "init": False,
                 "paycheck_threshold": 200,
-                "catagory": {
-                    "groceries": {"percent": 25, "balance": 0, "goal": 300},
-                    "general": {"percent": 25, "balance": 0, "goal": 300},
-                    "other": {"percent": 50, "balance": 0, "goal": 300},
-                },
             },
         )
         db.session.add(new_acc)
@@ -406,7 +410,9 @@ def full_update(user_id):
             oldbal = acc.current_bal
             acc.current_bal = account_bal
             db.session.commit()
-            update_acc_bal(acc, token, oldbal)
+            if acc.setting["init"]:
+                # only update if the account has been initialized
+                update_acc_bal(acc, token, oldbal)
         else:
             # If false, the account we pulled from api is new and need to be initialized
             # NOT DONE NEEDS WORK
