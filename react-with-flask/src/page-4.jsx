@@ -1,4 +1,4 @@
-import React from "react";
+import React, { use } from "react";
 // import Box from "@mui/material/Box";
 // import TextField from "@mui/material/TextField";
 import { useState, useEffect, useRef } from "react";
@@ -24,6 +24,7 @@ function Page4(props) {
   // this will be the setting page that allows the user to set up envelopes for each account
   // this will only work if the account has init
   // on submit sends a post request to /api/newsettings
+  const [total, setTotal] = useState(0);
   const data = [
     { name: "Mortgage", value: 30 },
     { name: "Rent", value: 20 },
@@ -40,6 +41,15 @@ function Page4(props) {
     { name: "Bill", value: 10 },
   ];
   const [selectedCategories, setSelectedCategories] = useState([]);
+  useEffect(() => {
+    // Calculate sum of all selected category values
+    // when catagories are updated
+    const total = selectedCategories.reduce(
+      (acc, item) => acc + (Number(item.value) || 0),
+      0
+    );
+    setTotal(total);
+  }, [selectedCategories]);
 
   const handleCheckboxChange = (category) => {
     setSelectedCategories((prev) => {
@@ -52,25 +62,24 @@ function Page4(props) {
         return [...prev, category];
       }
     });
+    // Calculate sum of all selected category values
   };
 
-  const handleValueChange = (name, newValue) => {
+  const handleValueChange = (name, value) => {
     setSelectedCategories((prev) =>
       prev.map((item) =>
-        item.name === name
-          ? { ...item, value: parseFloat(newValue) || 0 }
-          : item
+        item.name === name ? { ...item, value: parseFloat(value) || 0 } : item
       )
     );
   };
-
-  const isChecked = (name) =>
-    selectedCategories.some((item) => item.name === name);
 
   const getValue = (name) => {
     const found = selectedCategories.find((item) => item.name === name);
     return found ? found.value : "";
   };
+
+  const isChecked = (name) =>
+    selectedCategories.some((item) => item.name === name);
 
   return (
     <Box
@@ -146,7 +155,7 @@ function Page4(props) {
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
-                  data={data}
+                  data={selectedCategories}
                   cx="50%"
                   cy="50%"
                   labelLine={false}
@@ -174,44 +183,43 @@ function Page4(props) {
                 Categories:
               </Typography>
 
-              {["Mortgage", "Rent", "Fun", "Grocery", "Bill"].map((label) => (
-                <FormControlLabel
-                  key={label}
-                  control={<Checkbox sx={{ color: "white" }} />}
-                  label={`${label} __%`}
-                />
-              ))}
-
               <FormGroup>
-                {/* put blank nec to it that lets you change the value */}
                 {categories.map((category) => (
-                  <FormControlLabel
+                  <Box
                     key={category.name}
-                    control={
-                      <Checkbox
-                        checked={selectedCategories.some(
-                          (item) => item.name === category.name
-                        )}
-                        onChange={() => handleCheckboxChange(category)}
+                    display="flex"
+                    alignItems="center"
+                    sx={{ mb: 1, gap: 1 }}
+                  >
+                    <FormControlLabel
+                      control={
+                        <Checkbox
+                          checked={isChecked(category.name)}
+                          onChange={() => handleCheckboxChange(category)}
+                        />
+                      }
+                      label={category.name}
+                    />
+                    {isChecked(category.name) && (
+                      <TextField
+                        type="number"
+                        size="small"
+                        label="%"
+                        value={getValue(category.name)}
+                        onChange={(e) =>
+                          handleValueChange(category.name, e.target.value)
+                        }
+                        sx={{ width: 80 }}
                       />
-                    }
-                    label={category.name}
-                  />
+                    )}
+                  </Box>
                 ))}
+
+                <h4>Selected Data:</h4>
+                <pre>{JSON.stringify(selectedCategories, null, 2)}</pre>
               </FormGroup>
 
-              <h4>Selected Data:</h4>
-              <pre>{JSON.stringify(selectedCategories, null, 2)}</pre>
-
-              <Typography mt={1}>
-                Custom Categories: Add(+) Delete(-)
-              </Typography>
-              <FormControlLabel
-                control={<Checkbox sx={{ color: "white" }} />}
-                label="Gas __%"
-              />
-
-              <Typography mt={2}>Total: NULL%</Typography>
+              <Typography mt={2}>Total: {total}%</Typography>
 
               <Button
                 variant="contained"
