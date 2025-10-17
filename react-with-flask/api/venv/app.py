@@ -567,18 +567,34 @@ def change_settings():
     init = data["init"]
     account = Account.query.filter(id=account_id).first()
 
+    # catagory_list is alist:
+    # [
+    #     { name: "Mortgage", value: 30 },
+    #     { name: "Rent", value: 20 },
+    #     { name: "Fun", value: 15 },
+    #     { name: "Grocery", value: 25 },
+    #     { name: "Bill", value: 10 },
+    #       ];
+    catagory = {}
+    for item in catagory_list:
+        catagory[item["name"]] = {"percent": item["value"], "balance": 0, "goal": 300}
+
     if init:
         # we are going to grab the new catagories and refactor on the inside
         # so no disticntion between new catagories and old catagories
         # just grab the catagories from data and repopulate with transactions for each catagory
         # need to refactor update_acc_bal() to incorporate dates
         # we only want from the current pay period
-        account.setting["catagory"] = catagory_list
+        # "catagory": {
+        #         "groceries": {"percent": 25, "balance": 0, "goal": 300},
+        #         "general": {"percent": 25, "balance": 0, "goal": 300},
+        #         "other": {"percent": 50, "balance": 0, "goal": 300},
+        account.setting["catagory"] = catagory
 
     else:
         # ["settings"] is empty, populate straight from data
         # update init to true
-        account.setting["catagory"] = catagory_list
+        account.setting["catagory"] = catagory
         account.setting["init"] = True
 
     pass

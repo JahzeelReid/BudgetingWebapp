@@ -81,6 +81,34 @@ function Page4(props) {
   const isChecked = (name) =>
     selectedCategories.some((item) => item.name === name);
 
+  const handlesubmit = () => {
+    // send post request to /api/newsettings with selectedCategories as body
+    axios({
+      method: "POST",
+      url: `/api/newsettings`,
+      data: {
+        user_id: props.user_id,
+        acc_id: props.acc_id,
+        init: null,
+        setting: selectedCategories,
+        // access_token: accesstoken,
+      },
+    })
+      .then((response) => {
+        // setAccounts(response.data.accounts);
+        // setLoading(false);
+        // setLoginIn(true);
+      })
+      .catch((error) => {
+        if (error.response) {
+          console.log(error.response);
+          console.log(error.response.status);
+          console.log(error.response.headers);
+          // props.changepage(2);
+        }
+      });
+  };
+
   return (
     <Box
       sx={{
