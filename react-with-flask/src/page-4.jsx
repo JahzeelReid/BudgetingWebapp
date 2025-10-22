@@ -40,6 +40,7 @@ function Page4(props) {
     { name: "Grocery", value: 25 },
     { name: "Bill", value: 10 },
   ];
+  
   const [selectedCategories, setSelectedCategories] = useState([]);
   useEffect(() => {
     // Calculate sum of all selected category values
@@ -108,6 +109,30 @@ function Page4(props) {
         }
       });
   };
+
+  function fetchAccData() {
+    axios({
+      method: "POST",
+      url: `/api/getAccSettings`,
+      data: {
+        user_id: props.user_id,
+        // access_token: accesstoken,
+      },
+    })
+      .then((response) => {
+        setAccounts(response.data.accounts);
+      
+        // setLoginIn(true);
+      })
+      .catch((error) => {
+        if (error.response) {
+          console.log(error.response);
+          console.log(error.response.status);
+          console.log(error.response.headers);
+          // props.changepage(2);
+        }
+      });
+  }
 
   return (
     <Box

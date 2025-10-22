@@ -347,6 +347,29 @@ def get_dashboard_accounts():
     else:
         return jsonify({"message": "User not found"}), 404
 
+@app.route("/api/getAccSettings", methods=["POST"])
+def getaccsettings():
+    data = request.get_json()
+    user_id = data.get("user_id")
+    account_id = data.get("acc_id")
+    print("get_dashboard_accounts user_id: ", user_id)
+    print("get_dashboard_accounts acc_id: ", account_id)
+
+    account = Account.query.filter_by(id=account_id, user_id=user_id).first()
+    last_paycheck = Transaction.query.filter_by(id=account.lastpaycheck_id).first()
+    if account:
+        return jsonify({"lastfour": account.last_four,
+                    "balance": account.current_bal,
+                    "settings": account.setting,
+                    "paycheck_amount": last_paycheck.amount,
+                    "paycheck_date": last_paycheck.date}), 200
+    else:
+        return jsonify({"message": "no account"}), 404
+
+
+
+
+
 
 def full_update(user_id):
     # Inputs: user_id | we use this to identify the accounts that will be updated
