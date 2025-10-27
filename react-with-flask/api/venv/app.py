@@ -8,6 +8,9 @@ from sqlalchemy import JSON, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
 from decimal import Decimal
 from sqlalchemy.orm.attributes import flag_modified
+from werkzeug.security import generate_password_hash, check_password_hash
+import jwt
+import uuid
 
 
 class Base(DeclarativeBase):
@@ -42,6 +45,8 @@ class User(db.Model):
     # account_list: Mapped[list] = mapped_column(JSON, default=list, nullable=True)
     settings: Mapped[dict] = mapped_column(JSON, nullable=True)
     date: Mapped[str] = mapped_column(nullable=True)
+    public_id = db.Column(db.String(50), unique=True)
+    email: Mapped[str]
 
 
 class Account(db.Model):
@@ -102,17 +107,29 @@ def get_current_time():
 
 @app.route("/api/login", methods=["POST"])
 def login():
+
     data = request.get_json()
     username = data.get("username")
     password = data.get("password")
-
     user = User.query.filter_by(username=username).first()
 
-    if user and user.password == password:
-        print("logged in user ", user.id)
-        return jsonify({"message": "Login successful", "user_id": user.id}), 200
-    else:
-        return jsonify({"message": "Invalid username or password"}), 401
+    if not user or not check_password_hash(user.password, password):
+        return jsonify({"message": "Invalid email or password"}), 401
+
+    token = jwt.encode(
+        {
+            "public_id": user.public_id,
+            "exp": datetime.now(timezone.utc) + timedelta(hours=1),
+        },
+        app.config["SECRET_KEY"],
+        algorithm="HS256",
+    )
+
+    response = make_response(jsonify({"token": token, "message": "Login successful", "user_id": user.id}))
+    response.set_cookie("jwt_token", token)
+
+    return response, 200
+
 
 
 @app.route("/api/signup", methods=["POST"])
@@ -120,24 +137,46 @@ def signUp():
     data = request.get_json()
     username = data.get("username")
     password = data.get("password")
+    email = data.get("email")
     print("recived data: ", username, " - ", password)
-    user = User.query.filter_by(username=username).first()
 
-    if user:
-        print("Username already exists")
-        return jsonify({"message": "Username already exists"}), 401
-    else:
-        new_user = User(
-            access_token="init",
-            username=username,
-            password=password,
-            # account_list=account_id_list,
-            # we will update this one after init
-        )
-        db.session.add(new_user)
-        db.session.flush()
-        db.session.commit()
-        return jsonify({"message": "Signup successful", "user_id": new_user.id}), 200
+    existing_user = User.query.filter_by(username=username).first()
+    if existing_user:
+        return jsonify({"message": "User already exists. Please login."}), 400
+
+    hashed_password = generate_password_hash(password)
+    new_user = User(
+        access_token="init",
+        public_id=str(uuid.uuid4()),
+        username=username,
+        password=hashed_password,
+        email=email,
+    )
+
+    
+    db.session.add(new_user)
+    db.session.flush()
+    db.session.commit()
+    return jsonify({"message": "Signup successful", "user_id": new_user.id}), 200
+
+
+def token_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        token = request.cookies.get("jwt_token")
+
+        if not token:
+            return jsonify({"message": "Token is missing!"}), 401
+
+        try:
+            data = jwt.decode(token, app.config["SECRET_KEY"], algorithms=["HS256"])
+            current_user = User.query.filter_by(public_id=data["public_id"]).first()
+        except:
+            return jsonify({"message": "Token is invalid!"}), 401
+
+        return f(current_user, *args, **kwargs)
+
+    return decorated
 
 
 @app.route("/api/checkinit", methods=["POST"])
