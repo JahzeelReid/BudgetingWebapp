@@ -22,7 +22,10 @@ export default function SyncLoading(props) {
             setTimeout(checkSyncStatus, 2000);
           }
         })
-        .catch(() => navigate("/"));
+        .catch(
+          (error) => alert("Error checking sync status: " + error.message),
+          // navigate("/")
+        );
     };
 
     checkSyncStatus();
@@ -33,6 +36,9 @@ export default function SyncLoading(props) {
       <h2>Analyzing your spending...</h2>
       <div className="spinner"></div>
       <p>We're looking back 3 months to categorize your history.</p>
+      <button className="sync-button" onClick={() => checkSyncStatus()}>
+        Retry
+      </button>
     </div>
   );
 }

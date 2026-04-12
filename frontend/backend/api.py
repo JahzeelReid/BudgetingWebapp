@@ -14,6 +14,14 @@ from requests.auth import HTTPBasicAuth
 import requests
 import tempfile
 from contextlib import contextmanager
+from pathlib import Path
+from dotenv import load_dotenv
+import json
+from pywebpush import webpush, WebPushException
+from urllib.parse import urlparse
+
+
+print(f"DEBUG: VAPID_KEY is {os.getenv('VAPID_CLAIM_EMAIL')}")
 
 
 # 1. Base Class Setup
@@ -40,6 +48,9 @@ CORS(
         }
     },
 )
+# This finds the directory of app.py, then goes up one level to the root
+env_path = Path(__file__).resolve().parent.parent / ".env"
+load_dotenv(dotenv_path=env_path)
 
 # 2. Database Configuration
 db_url = os.getenv("DATABASE_URL", "sqlite:///project.db")
@@ -83,6 +94,7 @@ class Account(db.Model):
     teller_account_id: Mapped[str] = mapped_column(
         String(100), unique=True, nullable=False
     )
+    enrollment_id: Mapped[str] = mapped_column(String(100), nullable=True)
     institution_name: Mapped[str] = mapped_column(String(100), nullable=True)
     current_bal: Mapped[float] = mapped_column(Float, default=0.0)
     last_four: Mapped[str] = mapped_column(String(4), nullable=False)
@@ -101,11 +113,13 @@ class Account(db.Model):
 class Bucket(db.Model):
     __tablename__ = "bucket"
     id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("user.id"), nullable=False)
     account_id: Mapped[int] = mapped_column(ForeignKey("account.id"), nullable=False)
     name: Mapped[str] = mapped_column(String(50), nullable=False)
     percentage: Mapped[int] = mapped_column(nullable=False)  # e.g. 20 for 20%
     current_balance: Mapped[float] = mapped_column(Float, default=0.0)
     goal_amount: Mapped[float] = mapped_column(Float, nullable=True)
+    keywords: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
 
     account: Mapped["Account"] = relationship(back_populates="buckets")
     transactions: Mapped[list["Transaction"]] = relationship(back_populates="bucket")
@@ -128,6 +142,7 @@ class Transaction(db.Model):
     date: Mapped[str] = mapped_column(
         String(50)
     )  # Better as Date type, but kept as Str per your request
+    bucket_name: Mapped[str] = mapped_column(String(50), nullable=True)
 
     bucket: Mapped["Bucket"] = relationship(back_populates="transactions")
     account: Mapped["Account"] = relationship(back_populates="transactions")
@@ -336,6 +351,12 @@ def teller_mtls_certs():
 
 
 def perform_initial_90_day_sync(user):
+    cert_data = os.getenv("TELLER_CERT_CONTENT")
+    key_data = os.getenv("TELLER_KEY_CONTENT")
+    print(
+        "teller cert data: ", cert_data[:90], "..."
+    )  # Print first 30 chars for sanity check
+    print("teller key data: ", key_data[:90], "...")
     access_token = user.access_token
     auth = HTTPBasicAuth(access_token, "")
     with teller_mtls_certs() as cert_bundle:
@@ -381,6 +402,9 @@ def perform_initial_90_day_sync(user):
                     ),
                     current_bal=float(bal_info.get("available", 0.0)),
                     last_four=acc_data["last_four"],
+                    enrollment_id=acc_data.get(
+                        "enrollment_id", None
+                    ),  # Store enrollment_id if available
                 )
                 db.session.add(new_acc)
                 db.session.flush()  # Populate new_acc.id
@@ -392,35 +416,77 @@ def perform_initial_90_day_sync(user):
             buckets = {b.name: b for b in active_acc.buckets}
             if not buckets:
                 # We create buckets that match the keys in our map
-                default_buckets = [
-                    {"name": "groceries", "perc": 25},
-                    {"name": "gas", "perc": 10},
-                    {"name": "dining", "perc": 20},
-                    {"name": "bills", "perc": 30},
-                    {"name": "transportation", "perc": 10},
-                    {"name": "general", "perc": 15},
-                    {"name": "income", "perc": 0},
-                ]
+
                 default_buckets = [
                     {
                         "name": "groceries",
-                        "perc": 25,
-                        "keywords": ["walmart", "wegmans", "whole foods", "liquor"],
+                        "perc": 10,
+                        "keywords": [
+                            "walmart",
+                            "wegmans",
+                            "wholefoods",
+                            "whole foods",
+                            "liquor",
+                            "aldi",
+                            "kroger",
+                            "publix",
+                            "safeway",
+                            "trader joe",
+                            "costco",
+                            "target",
+                            "market",
+                            "mkt",
+                            "grocery",
+                            "supermarket",
+                            "food mart",
+                            "bakery",
+                            "bake shop",
+                            "butcher",
+                            "dairy",
+                            "bodega",
+                            "mart",
+                            "ASSOCIATED FRESH BROOKLYN",
+                        ],
                     },
                     {
                         "name": "gas",
-                        "perc": 10,
+                        "perc": 5,
                         "keywords": ["exxon", "shell", "wawa", "chevron", "sunoco"],
                     },
                     {
                         "name": "dining",
-                        "perc": 20,
+                        "perc": 15,
                         "keywords": [
                             "starbucks",
                             "mcdonalds",
                             "uber eats",
-                            "door dash",
+                            "doordash",
+                            "grubhub",
+                            "postmates",
                             "pizza",
+                            "deli",
+                            "dining",
+                            "restaurant",
+                            "tasty",
+                            "grill",
+                            "kitchen",
+                            "cafe",
+                            "bistro",
+                            "pub",
+                            "tavern",
+                            "bar",
+                            "coffee",
+                            "bakery",
+                            "steakhouse",
+                            "sushi",
+                            "burger",
+                            "diner",
+                            "eatery",
+                            "chipotle",
+                            "panera",
+                            "dunkin",
+                            "food",
+                            "terakawa",
                         ],
                     },
                     {
@@ -432,18 +498,62 @@ def perform_initial_90_day_sync(user):
                             "comcast",
                             "netflix",
                             "landlord",
+                            "sallie",
+                            "hannah",
+                            "discord",
+                            "spotify",
+                            "BK OF AMER VISA",
                         ],
                     },
                     {
                         "name": "transportation",
-                        "perc": 10,
-                        "keywords": ["uber", "lyft", "septa", "train", "parking"],
+                        "perc": 5,
+                        "keywords": [
+                            "uber",
+                            "lyft",
+                            "septa",
+                            "train",
+                            "parking",
+                            "flix",
+                            "mta",
+                        ],
                     },
-                    {"name": "general", "perc": 15, "keywords": []},
+                    {"name": "general", "perc": 10, "keywords": []},
                     {
                         "name": "income",
                         "perc": 0,
-                        "keywords": ["paycheck", "deposit", "transfer from"],
+                        "keywords": [
+                            "paycheck",
+                            "deposit",
+                            "transfer from",
+                            "payroll",
+                            "ach dep",
+                            "dir dep",
+                            "net pay",
+                            "salary",
+                            "remuneration",
+                            "zelle",
+                            "venmo",
+                            "cash app",
+                            "square cash",
+                            "paypal",
+                            "irs treas",
+                            "tax refund",
+                            "dividend",
+                            "interest",
+                        ],
+                    },
+                    {
+                        "name": "subscriptions",
+                        "perc": 10,
+                        "keywords": [
+                            "spotify",
+                            "apple music",
+                            "netflix",
+                            "discord",
+                            "fitness",
+                            "render",
+                        ],
                     },
                 ]
                 for b_data in default_buckets:
@@ -451,7 +561,10 @@ def perform_initial_90_day_sync(user):
                         account_id=active_acc.id,
                         name=b_data["name"],
                         percentage=b_data["perc"],
+                        keywords=b_data["keywords"],
                         current_balance=0.0,
+                        user_id=user.id,
+                        goal_amount=100.0,
                     )
                     db.session.add(new_b)
                 db.session.flush()
@@ -463,90 +576,141 @@ def perform_initial_90_day_sync(user):
                 acc_data["links"]["transactions"], auth=auth, cert=cert_bundle
             )
             if trans_response.status_code == 200:
-                for tx in reversed(trans_response.json()):
-                    # ... (Date filtering logic) ...
-                    tx_date = datetime.datetime.strptime(tx["date"], "%Y-%m-%d").date()
+                transaction_categorization(trans_response, active_acc)
 
-                    # 2. Only process if the transaction is within our 90-day window
-                    if tx_date < three_months_ago:
-                        continue
-
-                    # --- THE ENRICHED SORTING LOGIC ---
-                    # Access the 'details' object from Teller
-                    details = tx.get("details", {})
-                    teller_cat = details.get("category")
-                    # print(
-                    #     "Transaction: ",
-                    #     tx["description"],
-                    #     "Teller Category: ",
-                    #     teller_cat,
-                    # )
-                    if (
-                        teller_cat == "income"
-                        or "paycheck" in tx["description"].lower()
-                    ):
-                        is_income = True
-                    else:
-                        is_income = False
-
-                    if is_income:
-                        # If this paycheck is newer than the one we have stored
-                        if (
-                            not active_acc.last_paycheck_date
-                            or tx["date"] >= active_acc.last_paycheck_date
-                        ):
-                            active_acc.last_paycheck_amount = abs(float(tx["amount"]))
-                            active_acc.last_paycheck_date = tx["date"]
-
-                            # RESET LOGIC: New paycheck means clear the buckets!
-                            for b in active_acc.buckets:
-                                b.current_balance = 0.0
-
-                            db.session.flush()
-
-                    # 2. Assign to Bucket (only if it's NOT income)
-                    else:
-                        # ... your existing bucket assignment logic ...
-
-                        details = tx.get("details", {})
-                        teller_cat = details.get("category")  # e.g., "dining"
-
-                        # Look up our mapping, default to "General" if no match
-
-                        # we need to take the catagory and assign it a bucket id
-                        current_bucket = Bucket.query.filter_by(
-                            account_id=active_acc.id, name=teller_cat
-                        ).first()
-                        if not current_bucket:
-                            current_bucket = Bucket.query.filter_by(
-                                account_id=active_acc.id, name="general"
-                            ).first()
-                        assigned_bucket_id = current_bucket.id
-
-                        new_tx = Transaction(
-                            user_id=user.id,
-                            account_id=active_acc.id,
-                            teller_transaction_id=tx["id"],
-                            amount=float(tx["amount"]),
-                            description=tx["description"],
-                            date=tx["date"],
-                            bucket_id=assigned_bucket_id,
-                            category=teller_cat,
-                        )
-
-                        # Only deduct from bucket if it's an expense (positive amount in Teller)
-                        if new_tx.amount < 0 and teller_cat != "income":
-                            print(
-                                f"Adding to bucket '{current_bucket.name}' with amount {new_tx.amount}"
-                            )
-                            target_bucket = db.session.get(Bucket, assigned_bucket_id)
-
-                            current_bucket.current_balance += new_tx.amount
-
-                        db.session.add(new_tx)
+                #     # break
 
         db.session.commit()
     return jsonify({"status": "complete", "user_id": user.id})
+
+
+def transaction_categorization(transactions, account):
+    if account is None:
+        check_individual_account_id = True
+        new_transactions = transactions
+    else:
+        check_individual_account_id = False
+        new_transactions = transactions.json()
+
+    notifs = []
+
+    for tx in reversed(new_transactions):
+        if check_individual_account_id:
+            account_id = tx.get("account_id")
+            account = (
+                db.session.query(Account)
+                .filter_by(teller_account_id=account_id)
+                .first()
+            )
+        # ... (Date filtering logic) ...
+        tx_date = datetime.datetime.strptime(tx["date"], "%Y-%m-%d").date()
+        # --- THE ENRICHED SORTING LOGIC ---
+        # Access the 'details' object from Teller
+
+        # ... your existing bucket assignment logic ...
+
+        details = tx.get("details", {})
+        teller_cat = details.get("category")  # e.g., "dining"
+
+        # Look up our mapping, default to "General" if no match
+
+        # we need to take the catagory and assign it a bucket id
+
+        assigned_bucket = None
+
+        # 2. STEP ONE: Check Custom Keywords (Highest Priority)
+        # We look through our database buckets for any keyword matches in the description
+        for bucket in account.buckets:
+            # We assume you added a 'keywords' field to your Bucket model
+            # If it's a string, convert to list: keywords_list = bucket.keywords.split(',')
+            if bucket.name.lower() == "income" and float(tx["amount"]) < 0:
+                continue  # Don't assign negative transactions to Income bucket
+            keywords_list = bucket.keywords if isinstance(bucket.keywords, list) else []
+            description_lower = tx["description"].lower()
+
+            # 2. Check if any keyword in the list is a substring of the description
+            if any(keyword.lower() in description_lower for keyword in keywords_list):
+                assigned_bucket = bucket
+                break
+
+        # 3. STEP TWO: Use the Teller Map (Medium Priority)
+        if not assigned_bucket:
+            target_name = TELLER_TO_BUCKET_MAP.get(teller_cat)
+            if target_name:
+                # Find the bucket object by name
+                assigned_bucket = next(
+                    (
+                        b
+                        for b in account.buckets
+                        if b.name.lower() == target_name.lower()
+                    ),
+                    None,
+                )
+
+        # 4. STEP THREE: Final Fallback (Lowest Priority)
+        if not assigned_bucket:
+            assigned_bucket = next(
+                (b for b in account.buckets if b.name.lower() == "general"),
+                None,
+            )
+
+        assigned_bucket_id = assigned_bucket.id
+
+        if assigned_bucket.name.lower() == "income":
+            if (
+                not account.last_paycheck_date
+                or tx["date"] >= account.last_paycheck_date
+            ):
+                account.last_paycheck_amount = abs(float(tx["amount"]))
+                account.last_paycheck_date = tx["date"]
+                # RESET LOGIC: New paycheck means clear the buckets!
+                for b in account.buckets:
+                    b.current_balance = 0.0
+
+                db.session.flush()
+
+        new_tx = Transaction(
+            user_id=account.user_id,
+            account_id=account.id,
+            teller_transaction_id=tx["id"],
+            amount=float(tx["amount"]),
+            description=tx["description"],
+            date=tx["date"],
+            bucket_id=assigned_bucket_id,
+            category=teller_cat,
+            bucket_name=assigned_bucket.name,
+        )
+
+        # Only deduct from bucket if it's an expense (positive amount in Teller)
+
+        # target_bucket = db.session.get(Bucket, assigned_bucket_id)
+
+        assigned_bucket.current_balance += new_tx.amount
+
+        db.session.add(new_tx)
+        db.session.commit()
+        # break
+        present = False
+        for notif in notifs:
+            if notif["bucket_name"] == new_tx.bucket_name:
+                notif["charges"].append(new_tx.amount)
+                notif["remainder"] = (
+                    assigned_bucket.goal_amount - assigned_bucket.current_balance
+                )
+                notif["account"] = account
+                present = True
+        if not present:
+            notifs.append(
+                {
+                    "bucket_name": new_tx.bucket_name,
+                    "charges": [new_tx.amount],
+                    "remainder": (
+                        assigned_bucket.goal_amount - assigned_bucket.current_balance
+                    ),
+                    "account": account,
+                }
+            )
+    return notifs
 
 
 @app.route("/api/sync-status", methods=["GET"])
@@ -584,24 +748,24 @@ def get_user_buckets(current_user):
             "balance": acc.current_bal,
             "last_four": acc.last_four,
             "last_paycheck": reference_income,
+            "last_paycheck_date": acc.last_paycheck_date or "",
             "buckets": [],
+            "teller_account_id": acc.teller_account_id,
         }
 
         for bucket in acc.buckets:
             # Simple math for the progress bar: (spent / goal) * 100
             # If goal is None, we just show the balance
+            if bucket.name.lower() == "income":
+                continue
             calculated_goal = reference_income * (bucket.percentage / 100.0)
-            print(
-                f"Bucket: {bucket.name}, Current Balance: {bucket.current_balance}, Goal: {calculated_goal}"
-            )
-            print(
-                f"Reference Income: {reference_income}, Percentage: {bucket.percentage}%"
-            )
+
             acc_data["buckets"].append(
                 {
                     "id": bucket.id,
                     "name": bucket.name,
-                    "current_balance": bucket.current_balance,
+                    "current_balance": (bucket.current_balance)
+                    * -1,  # Convert to positive for frontend
                     "goal_amount": calculated_goal,
                     "percentage": bucket.percentage,
                 }
@@ -609,6 +773,275 @@ def get_user_buckets(current_user):
         accounts.append(acc_data)
     # print("Returning buckets for user_id: ", current_user.id, "Accounts: ", accounts)
     return jsonify({"accounts": accounts}), 200
+
+
+@app.route("/api/bucket-transactions", methods=["POST"])
+@token_required
+def get_bucket_transactions(current_user):
+    data = request.get_json()
+    bucket_id = data.get("bucket")
+    # bucket = Bucket.query.filter_by(id=bucket_id, user_id=current_user.id).first()
+    print("Received request for transactions of bucket_id: ", bucket_id)
+    bucket = (
+        db.session.query(Bucket)
+        .filter_by(id=bucket_id, user_id=current_user.id)
+        .first()
+    )
+    print(
+        "Fetching transactions for bucket_id: ", bucket.id, "and called: ", bucket.name
+    )
+    account = Account.query.filter_by(
+        id=bucket.account_id, user_id=current_user.id
+    ).first()
+    if not bucket:
+        return jsonify({"error": "Bucket not found or inaccessible"}), 404
+
+    # transactions = Transaction.query.filter_by(user_id=current_user.id, bucket_id=bucket_id,).filter(date >= account.last_paycheck_date).all()
+    transactions = (
+        Transaction.query.filter(
+            Transaction.user_id == current_user.id,
+            Transaction.bucket_id == bucket_id,
+            Transaction.date >= account.last_paycheck_date,
+        )
+        .order_by(Transaction.date.desc())
+        .all()
+    )
+
+    tx_list = []
+    for tx in transactions:
+        tx_list.append(
+            {
+                "id": tx.id,
+                "description": tx.description,
+                "amount": tx.amount,
+                "date": tx.date,
+                "category": tx.category,
+                "account_id": tx.account_id,
+            }
+        )
+
+    return jsonify({"transactions": tx_list}), 200
+
+
+@app.route("/api/move_transactions_bucket", methods=["POST"])
+@token_required
+def move_transactions_bucket(current_user):
+    data = request.get_json()
+    transaction_id = data.get("transaction_id")
+    current_bucket_id = data.get("current_bucket_id")
+    new_bucket_id = data.get("new_bucket_id")
+    transaction = Transaction.query.filter_by(
+        id=transaction_id, user_id=current_user.id
+    ).first()
+    # to make this work we need to change the transactions bucket id, bucket name, and bucket
+    # we need to subtract the amount from the old bucket, add it to the new one
+    current_bucket = Bucket.query.filter_by(
+        id=current_bucket_id, user_id=current_user.id
+    ).first()
+    new_bucket = Bucket.query.filter_by(
+        id=new_bucket_id, user_id=current_user.id
+    ).first()
+
+    transaction.bucket_id = new_bucket_id
+    transaction.bucket_name = new_bucket.name
+    transaction.bucket = new_bucket
+    current_bucket.current_balance -= transaction.amount
+    new_bucket.current_balance += transaction.amount
+    db.session.commit()
+    return jsonify({"message": "Transaction moved successfully"}), 200
+
+
+@app.route("/api/save-subscription", methods=["POST"])
+@token_required
+def save_subscription(current_user):
+    # 1. Capture the incoming JSON from the React frontend
+    data = request.get_json()
+    # print("Received subscription data: ", data)
+
+    # 2. Validation: Ensure the data isn't empty and contains the 'endpoint'
+    # The 'endpoint' is the unique URL provided by Google/Apple/Mozilla
+    if not data or "endpoint" not in data.get("sub"):
+        return jsonify({"error": "Invalid subscription data"}), 400
+
+    try:
+        # 3. Efficiency Check: Only update the DB if the subscription has actually changed
+        # This prevents unnecessary database writes if the user clicks 'Enable' multiple times
+        new_sub_json = json.dumps(data.get("sub"))
+
+        if current_user.push_subscription != new_sub_json:
+            current_user.push_subscription = new_sub_json
+            db.session.commit()
+            status = "Subscription updated"
+        else:
+            status = "Subscription already up to date"
+
+        return jsonify({"status": "success", "message": status}), 200
+
+    except Exception as e:
+        # 4. Rollback: If the database write fails, undo any pending changes
+        db.session.rollback()
+        # Log the error for debugging (ideally use app.logger)
+        print(f"Error saving subscription for user {current_user.id}: {e}")
+        return jsonify({"error": "Internal server error"}), 500
+
+
+@app.route("/api/test-push", methods=["POST"])
+@token_required
+def test_push(current_user):
+    return push_notification(
+        current_user,
+        "LOSER Alert! 🔔",
+        "This is a manual trigger from \nyour Flask backend.",
+        "/dashboard",
+    )
+
+
+def push_notification(current_user, title, body, url):
+    # 1. Check if the user even has a subscription stored
+    if not current_user.push_subscription:
+        return jsonify({"error": "No subscription found for this user"}), 404
+
+    # 2. Convert the stored string back into a dictionary for pywebpush
+    # subscription_info = json.loads(current_user.push_subscription)
+    sub_data = current_user.push_subscription
+    if isinstance(sub_data, str):
+        subscription_info = json.loads(sub_data)
+
+        # If subscription_info is STILL a string after one load, load it again
+        # (The classic "Double-JSON" trap)
+        if isinstance(subscription_info, str):
+            subscription_info = json.loads(subscription_info)
+    else:
+        subscription_info = sub_data
+    print("Testing push with subscription: ", subscription_info)
+    # parsed_url = urlparse(subscription_info["endpoint"])
+    # audience = f"{parsed_url.scheme}://{parsed_url.netloc}"
+
+    try:
+        # 3. Fire the notification
+        webpush(
+            subscription_info=subscription_info,
+            data=json.dumps(
+                {
+                    "title": title,
+                    "body": body,
+                    "url": url,  # Where the user goes when they click
+                }
+            ),
+            vapid_private_key=os.getenv("VAPID_PRIVATE_KEY"),
+            vapid_claims={
+                "sub": os.getenv("VAPID_CLAIM_EMAIL"),
+                #   "aud": audience
+            },
+        )
+        return jsonify({"status": "Push sent successfully"}), 200
+
+    except WebPushException as ex:
+        print(f"Web Push Error: {ex}")
+        return jsonify({"error": "Failed to send push"}), 500
+
+
+@app.route("/hooks/teller", methods=["POST"])
+def teller_webhook():
+    # 1. Capture the incoming webhook data from Teller
+    data = request.get_json()
+    print("Received Teller webhook: ", data)
+
+    # 2. Validate the webhook (e.g., check a signature or secret if Teller provides one)
+    # For simplicity, we'll skip this step, but in production, you should verify the source!
+
+    # 3. Process the webhook based on its type
+    event_type = data.get("type")
+    payload = data.get("payload")
+
+    if event_type == "transactions.processed":
+        # Handle new transaction logic here
+        print("New transaction created: ", payload)
+        # You might want to re-run the categorization logic for this transaction's account
+        # Or simply add it to the appropriate bucket based on its details'
+        enrollment_id = payload.get("enrollment_id")
+        current_acc = (
+            db.session.query(Account).filter_by(enrollment_id=enrollment_id).first()
+        )
+        transaction_list = payload.get("transactions")
+        for transaction in transaction_list:
+            try:
+
+                transaction_values = transaction_categorization([transaction], None)
+                current_acc = transaction_values[0]["account"]
+                current_user = (
+                    db.session.query(User).filter_by(id=current_acc.user_id).first()
+                )
+                bucket_name = transaction_values[0]["bucket_name"]
+                charge = transaction_values[0]["charges"][0]
+                remainder = transaction_values[0]["remainder"]
+                if bucket_name == "income":
+                    push_notification(
+                        current_user,
+                        f"New Paycheck of ${charge} Received! 💰",
+                        f"Your paycheck has been processed.",
+                        "/dashboard",
+                    )
+                else:
+                    push_notification(
+                        current_user,
+                        f"${remainder} Left in {bucket_name}",
+                        f"Recent charge of {charge}",
+                        "/dashboard",
+                    )
+
+            except Exception as e:
+                # 4. Rollback: If the database write fails, undo any pending changes
+                db.session.rollback()
+                # Log the error for debugging (ideally use app.logger)
+                print(f"Error saving subscription for user {current_user.id}: {e}")
+
+        # return a list of transactions that has the bucket
+        # Your recent transaction
+        # bucket: remaining balance
+        # - transaction
+        # - transaction
+
+    elif event_type == "enrollment.disconnected":
+        # Handle account update logic here (e.g., balance changes)
+        print("Account updated: ", payload)
+    elif event_type == "account.number_verification.processed":
+        # Handle account verification logic here
+        print("Account verification result: ", payload)
+    else:
+        print("Unhandled event type: ", event_type)
+        current_user = db.session.query(User).filter_by(id=1).first()
+        push_notification(
+            current_user,
+            "New Teller Webhook",
+            f"Received event: {event_type}",
+            "/dashboard",
+        )
+
+    return jsonify({"status": "Webhook received"}), 200
+
+
+@app.route("/api/update_bucket_goals", methods=["POST"])
+@token_required
+def update_bucket_goals(current_user):
+    data = request.get_json()
+    buckets = data.get("buckets", [])
+    T_acc_id = data.get("account_id")
+    print("Received bucket goal update: ", buckets)
+    acc = db.session.query(Account).filter_by(teller_account_id=T_acc_id).first()
+    for b in buckets:
+        bucket = (
+            db.session.query(Bucket)
+            .filter_by(user_id=current_user.id, account_id=acc.id, name=b["name"])
+            .first()
+        )
+        if bucket:
+            bucket.percentage = b["percentage"]
+            bucket.goal_amount = b["goal_amount"]
+
+    db.session.commit()
+
+    return jsonify({"status": "Bucket goals updated successfully"}), 200
 
 
 # Create tables logic (Run once)

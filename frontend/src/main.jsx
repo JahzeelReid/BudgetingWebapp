@@ -7,10 +7,11 @@ import { BrowserRouter } from "react-router-dom";
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
+    // We only need THIS one:
     navigator.serviceWorker
       .register("/sw.js")
-      .then((reg) => console.log("Service Worker registered!", reg.scope))
-      .catch((err) => console.log("Service Worker failed:", err));
+      .then((reg) => console.log("SW registered! Scope:", reg.scope))
+      .catch((err) => console.error("SW registration failed:", err));
   });
 }
 

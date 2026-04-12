@@ -33,6 +33,7 @@ build/
 
 # --- Backend (Python) ---
 backend/venv/
+backend/instance/
 backend/__pycache__/
 backend/*.py[cod]
 backend/*$py.class

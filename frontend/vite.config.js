@@ -7,6 +7,13 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
+      includeAssets: [
+        "/vite.svg",
+        "favicon.svg",
+        "favicon.ico",
+        "robots.txt",
+        "apple-touch-icon.png",
+      ],
       registerType: "autoUpdate",
       manifest: {
         name: "My Budget Bucket",
