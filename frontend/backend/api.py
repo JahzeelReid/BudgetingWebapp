@@ -887,12 +887,17 @@ def save_subscription(current_user):
 @app.route("/api/test-push", methods=["POST"])
 @token_required
 def test_push(current_user):
-    return push_notification(
-        current_user,
-        "LOSER Alert! 🔔",
-        "This is a manual trigger from \nyour Flask backend.",
-        "/dashboard",
-    )
+    try:
+        push_notification(
+            current_user,
+            "LOSER Alert! 🔔",
+            "This is a manual trigger from \nyour Flask backend.",
+            "/dashboard",
+        )
+        return jsonify({"status": "Test push sent"}), 200
+    except Exception as e:
+        print(f"Error sending push notification for user {current_user.id}: {e}")
+        return jsonify({"error": e}), 500
 
 
 def push_notification(current_user, title, body, url):

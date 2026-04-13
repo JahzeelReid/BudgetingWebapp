@@ -19,7 +19,7 @@ export default function TestNotificationButton({ url }) {
         },
       }).catch((err) => {
         console.error("Error triggering test push:", err);
-        setStatus("Error triggering test push.");
+        setStatus(err);
       });
     } catch (err) {
       setStatus("Network error.");
