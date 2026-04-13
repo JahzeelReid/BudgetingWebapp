@@ -1,5 +1,6 @@
 import os
 import time
+import traceback
 from flask import Flask, jsonify, request
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import JSON, String, Float, ForeignKey
@@ -897,7 +898,8 @@ def test_push(current_user):
         return response_tuple
     except Exception as e:
         print(f"Error sending push notification for user {current_user.id}: {e}")
-        return jsonify({"error": e}), 500
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
 
 
 def push_notification(current_user, title, body, url):

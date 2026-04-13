@@ -22,7 +22,7 @@ export default function TestNotificationButton({ url }) {
           setStatus(res);
         })
         .catch((err) => {
-          console.error("Error triggering test push:", err);
+          // console.error("Error triggering test push:", err);
           const errorMessage =
             err.response?.data?.error || err.message || "Failed to send";
           setStatus(errorMessage);
