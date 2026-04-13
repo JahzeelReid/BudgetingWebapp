@@ -13,7 +13,7 @@ function App() {
   const API_BASE_URL = import.meta.env.DEV
     ? // ? "http://127.0.0.1:5000"
       "http://localhost:5000"
-    : "https://placeholder.com";
+    : "https://budgeting-backend-mi50.onrender.com";
 
   return (
     <>
