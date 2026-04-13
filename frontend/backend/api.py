@@ -888,13 +888,13 @@ def save_subscription(current_user):
 @token_required
 def test_push(current_user):
     try:
-        push_notification(
+        response_tuple = push_notification(
             current_user,
             "LOSER Alert! 🔔",
             "This is a manual trigger from \nyour Flask backend.",
             "/dashboard",
         )
-        return jsonify({"status": "Test push sent"}), 200
+        return response_tuple
     except Exception as e:
         print(f"Error sending push notification for user {current_user.id}: {e}")
         return jsonify({"error": e}), 500
