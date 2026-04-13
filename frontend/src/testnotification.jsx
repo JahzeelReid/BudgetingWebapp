@@ -23,7 +23,9 @@ export default function TestNotificationButton({ url }) {
         })
         .catch((err) => {
           console.error("Error triggering test push:", err);
-          setStatus(err);
+          const errorMessage =
+            err.response?.data?.error || err.message || "Failed to send";
+          setStatus(errorMessage);
         });
     } catch (err) {
       setStatus("Network error.");
