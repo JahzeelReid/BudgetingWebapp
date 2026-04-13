@@ -17,10 +17,14 @@ export default function TestNotificationButton({ url }) {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-      }).catch((err) => {
-        console.error("Error triggering test push:", err);
-        setStatus(err);
-      });
+      })
+        .then((res) => {
+          setStatus(res);
+        })
+        .catch((err) => {
+          console.error("Error triggering test push:", err);
+          setStatus(err);
+        });
     } catch (err) {
       setStatus("Network error.");
     }

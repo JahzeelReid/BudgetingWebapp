@@ -942,7 +942,7 @@ def push_notification(current_user, title, body, url):
 
     except WebPushException as ex:
         print(f"Web Push Error: {ex}")
-        return jsonify({"error": "Failed to send push"}), 500
+        return jsonify({"error": str(ex)}), 500
 
 
 @app.route("/hooks/teller", methods=["POST"])
