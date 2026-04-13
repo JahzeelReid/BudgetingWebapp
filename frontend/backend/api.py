@@ -40,8 +40,7 @@ CORS(
             "origins": [
                 "http://localhost:5173",
                 "http://127.0.0.1:5173",
-                "https://opentablexcrm-connections-1.onrender.com",
-                "https://app.tabletextpro.com",
+                "https://budgeting-frontend-5hif.onrender.com",
             ],
             "allow_headers": ["Content-Type", "Authorization"],
             "methods": ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
