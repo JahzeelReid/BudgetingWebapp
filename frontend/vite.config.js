@@ -8,8 +8,11 @@ export default defineConfig({
     react(),
     VitePWA({
       strategies: "injectManifest", // <--- TELL VITE TO USE YOUR FILE
-      srcDir: "public", // <--- WHERE YOUR FILE IS
+      srcDir: "src", // <--- WHERE YOUR FILE IS
       filename: "sw.js",
+      injectManifest: {
+        swDest: "dist/sw.js", // <--- This ensures it goes to the output folder
+      },
       includeAssets: [
         "/vite.svg",
         "favicon.svg",

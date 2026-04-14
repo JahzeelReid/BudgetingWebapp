@@ -1,4 +1,8 @@
-self.__WB_MANIFEST;
+import { precacheAndRoute } from "workbox-precaching";
+
+// Workbox will replace this with the list of files to cache
+// It must be exactly this variable name
+precacheAndRoute(self.__WB_MANIFEST);
 const CACHE_NAME = "bucket-spend-v1";
 const URLS_TO_CACHE = ["/", "/index.html", "/manifest.json", "/favicon.ico"];
 
