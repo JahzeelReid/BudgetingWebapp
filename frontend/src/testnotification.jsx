@@ -19,12 +19,15 @@ export default function TestNotificationButton({ url }) {
         },
       })
         .then((res) => {
-          setStatus(res);
+          console.log("Test push sent successfully:", res);
+          setStatus(res.data.message || "Test notification sent!");
         })
         .catch((err) => {
-          // console.error("Error triggering test push:", err);
+          console.log("Error triggering test push:", err);
+
           const errorMessage =
             err.response?.data?.error || err.message || "Failed to send";
+
           setStatus(errorMessage);
         });
     } catch (err) {
