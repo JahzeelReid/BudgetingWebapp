@@ -7,6 +7,9 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
+      strategies: "injectManifest", // <--- TELL VITE TO USE YOUR FILE
+      srcDir: "public", // <--- WHERE YOUR FILE IS
+      filename: "sw.js",
       includeAssets: [
         "/vite.svg",
         "favicon.svg",
@@ -22,12 +25,12 @@ export default defineConfig({
         theme_color: "#ffffff",
         icons: [
           {
-            src: "pwa-192x192.png",
+            src: "icon-192x192.png",
             sizes: "192x192",
             type: "image/png",
           },
           {
-            src: "pwa-512x512.png",
+            src: "icon-512x512.png",
             sizes: "512x512",
             type: "image/png",
           },
