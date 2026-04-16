@@ -16,6 +16,7 @@ import PushSubscription from "./PushSubscription";
 import TestNotificationButton from "./testnotification";
 import UpdateBucketDrawer from "./UpdateBucketDrawer";
 import EditSquareIcon from "@mui/icons-material/EditSquare";
+import RefreshIcon from "@mui/icons-material/Refresh";
 
 const RM_COLORS = {
   bg: "#0F111A",
@@ -51,6 +52,37 @@ export default function Dashboard2(props) {
       account.teller_account_id,
     ]);
     setIsSettingOpen(true);
+  };
+  const refreshBuckets = () => {
+    setLoading(true);
+    axios({
+      method: "POST",
+      url: `${props.url}/api/refresh_transactions`,
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      data: {},
+    })
+      .then((res) => {
+        console.log("Test push sent successfully:", res);
+        setLoading(false);
+      })
+      .catch((err) => {
+        console.log("Error triggering test push:", err);
+      });
+    // axios
+    //   .get(`${props.url}/api/buckets`, {
+    //     headers: { Authorization: `Bearer ${token}` },
+    //   })
+    //   .then((res) => {
+    //     setAccounts(res.data.accounts || []);
+    //     setLoading(false);
+    //   })
+    //   .catch((err) => {
+    //     console.error("Error fetching buckets", err);
+    //     setLoading(false);
+    //   });
   };
 
   useEffect(() => {
@@ -193,7 +225,7 @@ export default function Dashboard2(props) {
                           variant="caption"
                           sx={{ color: RM_COLORS.textSecondary, ml: 0.5 }}
                         >
-                          / ${bucket.goal_amount || "0"}
+                          / ${Number(bucket.goal_amount || 0).toFixed(2)}
                         </Typography>
                       </Typography>
                     </Box>
@@ -227,6 +259,9 @@ export default function Dashboard2(props) {
               sx={{ mb: 2 }}
             >
               <EditSquareIcon />
+            </Button>
+            <Button size="large" onClick={refreshBuckets} sx={{ mb: 2 }}>
+              <RefreshIcon />
             </Button>
           </Grid>
         </Paper>

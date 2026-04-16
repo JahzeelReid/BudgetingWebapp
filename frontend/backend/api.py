@@ -351,12 +351,12 @@ def teller_mtls_certs():
 
 
 def perform_initial_90_day_sync(user):
-    cert_data = os.getenv("TELLER_CERT_CONTENT")
-    key_data = os.getenv("TELLER_KEY_CONTENT")
-    print(
-        "teller cert data: ", cert_data[:90], "..."
-    )  # Print first 30 chars for sanity check
-    print("teller key data: ", key_data[:90], "...")
+    # cert_data = os.getenv("TELLER_CERT_CONTENT")
+    # key_data = os.getenv("TELLER_KEY_CONTENT")
+    # print(
+    #     "teller cert data: ", cert_data[:90], "..."
+    # )  # Print first 30 chars for sanity check
+    # print("teller key data: ", key_data[:90], "...")
     access_token = user.access_token
     auth = HTTPBasicAuth(access_token, "")
     with teller_mtls_certs() as cert_bundle:
@@ -380,13 +380,6 @@ def perform_initial_90_day_sync(user):
                 db.session.query(Account)
                 .filter_by(teller_account_id=acc_data["id"])
                 .first()
-            )
-            print(
-                "Processing account: ",
-                acc_data["id"],
-                "Existing in DB? ",
-                bool(existing_acc),
-                "\n\n",
             )
             if not existing_acc:
                 # Fetch Balance for the new account
@@ -608,6 +601,13 @@ def transaction_categorization(transactions, account):
         # Access the 'details' object from Teller
 
         # ... your existing bucket assignment logic ...
+        id = tx["id"]
+        found_tx = (
+            db.session.query(Transaction).filter_by(teller_transaction_id=id).first()
+        )
+        if found_tx:
+            print("Transaction already exists in DB, skipping: ", id)
+            continue  # Skip to the next transaction
 
         details = tx.get("details", {})
         teller_cat = details.get("category")  # e.g., "dining"
@@ -711,6 +711,231 @@ def transaction_categorization(transactions, account):
                 }
             )
     return notifs
+
+
+@app.route("/api/refresh_transactions", methods=["POST"])
+@token_required
+def refresh_transactions(current_user):
+    # Logic for refreshing transactions
+    data = request.get_json()
+    # Get access token
+    access_token = current_user.access_token
+    auth = HTTPBasicAuth(access_token, "")
+    with teller_mtls_certs() as cert_bundle:
+        accounts_response = requests.get(
+            "https://api.teller.io/accounts", auth=auth, cert=cert_bundle
+        )
+        if accounts_response.status_code != 200:
+            return jsonify({"error": "Failed to fetch accounts from Teller"}), 400
+
+        accounts = accounts_response.json()
+
+        for acc_data in accounts:
+            existing_acc = (
+                db.session.query(Account)
+                .filter_by(teller_account_id=acc_data["id"])
+                .first()
+            )
+            if not existing_acc:
+                # Fetch Balance for the new account
+                bal_info = requests.get(
+                    acc_data["links"]["balances"], auth=auth, cert=cert_bundle
+                ).json()
+
+                new_acc = Account(
+                    user_id=user.id,
+                    teller_account_id=acc_data["id"],  # Matches your model
+                    institution_name=acc_data.get("institution", {}).get(
+                        "name", "Bank"
+                    ),
+                    current_bal=float(bal_info.get("available", 0.0)),
+                    last_four=acc_data["last_four"],
+                    enrollment_id=acc_data.get(
+                        "enrollment_id", None
+                    ),  # Store enrollment_id if available
+                )
+                db.session.add(new_acc)
+                db.session.flush()  # Populate new_acc.id
+                active_acc = new_acc
+            else:
+                active_acc = existing_acc
+
+            buckets = {b.name: b for b in active_acc.buckets}
+            if not buckets:
+                # We create buckets that match the keys in our map
+
+                default_buckets = [
+                    {
+                        "name": "groceries",
+                        "perc": 10,
+                        "keywords": [
+                            "walmart",
+                            "wegmans",
+                            "wholefoods",
+                            "whole foods",
+                            "liquor",
+                            "aldi",
+                            "kroger",
+                            "publix",
+                            "safeway",
+                            "trader joe",
+                            "costco",
+                            "target",
+                            "market",
+                            "mkt",
+                            "grocery",
+                            "supermarket",
+                            "food mart",
+                            "bakery",
+                            "bake shop",
+                            "butcher",
+                            "dairy",
+                            "bodega",
+                            "mart",
+                            "ASSOCIATED FRESH BROOKLYN",
+                        ],
+                    },
+                    {
+                        "name": "gas",
+                        "perc": 5,
+                        "keywords": ["exxon", "shell", "wawa", "chevron", "sunoco"],
+                    },
+                    {
+                        "name": "dining",
+                        "perc": 15,
+                        "keywords": [
+                            "starbucks",
+                            "mcdonalds",
+                            "uber eats",
+                            "doordash",
+                            "grubhub",
+                            "postmates",
+                            "pizza",
+                            "deli",
+                            "dining",
+                            "restaurant",
+                            "tasty",
+                            "grill",
+                            "kitchen",
+                            "cafe",
+                            "bistro",
+                            "pub",
+                            "tavern",
+                            "bar",
+                            "coffee",
+                            "bakery",
+                            "steakhouse",
+                            "sushi",
+                            "burger",
+                            "diner",
+                            "eatery",
+                            "chipotle",
+                            "panera",
+                            "dunkin",
+                            "food",
+                            "terakawa",
+                        ],
+                    },
+                    {
+                        "name": "bills",
+                        "perc": 30,
+                        "keywords": [
+                            "verizon",
+                            "peco",
+                            "comcast",
+                            "netflix",
+                            "landlord",
+                            "sallie",
+                            "hannah",
+                            "discord",
+                            "spotify",
+                            "BK OF AMER VISA",
+                        ],
+                    },
+                    {
+                        "name": "transportation",
+                        "perc": 5,
+                        "keywords": [
+                            "uber",
+                            "lyft",
+                            "septa",
+                            "train",
+                            "parking",
+                            "flix",
+                            "mta",
+                        ],
+                    },
+                    {"name": "general", "perc": 10, "keywords": []},
+                    {
+                        "name": "income",
+                        "perc": 0,
+                        "keywords": [
+                            "paycheck",
+                            "deposit",
+                            "transfer from",
+                            "payroll",
+                            "ach dep",
+                            "dir dep",
+                            "net pay",
+                            "salary",
+                            "remuneration",
+                            "zelle",
+                            "venmo",
+                            "cash app",
+                            "square cash",
+                            "paypal",
+                            "irs treas",
+                            "tax refund",
+                            "dividend",
+                            "interest",
+                        ],
+                    },
+                    {
+                        "name": "subscriptions",
+                        "perc": 10,
+                        "keywords": [
+                            "spotify",
+                            "apple music",
+                            "netflix",
+                            "discord",
+                            "fitness",
+                            "render",
+                        ],
+                    },
+                ]
+                for b_data in default_buckets:
+                    new_b = Bucket(
+                        account_id=active_acc.id,
+                        name=b_data["name"],
+                        percentage=b_data["perc"],
+                        keywords=b_data["keywords"],
+                        current_balance=0.0,
+                        user_id=user.id,
+                        goal_amount=100.0,
+                    )
+                    db.session.add(new_b)
+                db.session.flush()
+                db.session.refresh(active_acc)
+                buckets = {b.name: b for b in active_acc.buckets}
+
+            # 4. Fetch Enriched Transactions
+            query_params = {"start_date": active_acc.last_paycheck_date}
+            trans_response = requests.get(
+                acc_data["links"]["transactions"],
+                auth=auth,
+                cert=cert_bundle,
+                params=query_params,
+            )
+            if trans_response.status_code == 200:
+                transaction_categorization(trans_response, active_acc)
+
+                #     # break
+        db.session.commit()
+    return jsonify({"status": "complete", "user_id": current_user.id})
+
+    # get all transactions since the last paycheck date for all accounts and re-run the categorization logic
+
+    pass
 
 
 @app.route("/api/sync-status", methods=["GET"])

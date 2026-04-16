@@ -324,7 +324,11 @@ export default function TransactionDrawer({
             variant="body2"
             sx={{ color: RM_COLORS.accent, fontWeight: 600 }}
           >
-            ${bucket.current_balance?.toLocaleString()} remaining
+            $
+            {(
+              (bucket.goal_amount || 0) - (bucket.current_balance || 0)
+            ).toLocaleString()}{" "}
+            remaining
           </Typography>
         </Box>
         <IconButton
