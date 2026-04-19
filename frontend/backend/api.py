@@ -736,14 +736,14 @@ def refresh_transactions(current_user):
                 .filter_by(teller_account_id=acc_data["id"])
                 .first()
             )
+            bal_info = requests.get(
+                acc_data["links"]["balances"], auth=auth, cert=cert_bundle
+            ).json()
             if not existing_acc:
                 # Fetch Balance for the new account
-                bal_info = requests.get(
-                    acc_data["links"]["balances"], auth=auth, cert=cert_bundle
-                ).json()
 
                 new_acc = Account(
-                    user_id=user.id,
+                    user_id=current_user.id,
                     teller_account_id=acc_data["id"],  # Matches your model
                     institution_name=acc_data.get("institution", {}).get(
                         "name", "Bank"
@@ -758,6 +758,7 @@ def refresh_transactions(current_user):
                 db.session.flush()  # Populate new_acc.id
                 active_acc = new_acc
             else:
+                active_acc.current_bal = float(bal_info.get("available", 0.0))
                 active_acc = existing_acc
 
             buckets = {b.name: b for b in active_acc.buckets}
