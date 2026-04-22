@@ -317,33 +317,73 @@ def initialize_teller(current_user):
     return jsonify({"message": "Sync started"}), 200
 
 
+# @contextmanager
+# def teller_mtls_certs():
+#     # 1. Get the text from environment variables
+#     cert_data = os.getenv("TELLER_CERT_CONTENT")
+#     key_data = os.getenv("TELLER_KEY_CONTENT")
+
+#     if not cert_data or not key_data:
+#         raise ValueError("Teller mTLS credentials missing from environment!")
+
+#     # 2. Create temporary files
+#     with tempfile.NamedTemporaryFile(
+#         mode="w", delete=False, suffix=".crt"
+#     ) as cert_file, tempfile.NamedTemporaryFile(
+#         mode="w", delete=False, suffix=".key"
+#     ) as key_file:
+
+#         cert_file.write(cert_data)
+#         key_file.write(key_data)
+
+#         cert_file_path = cert_file.name
+#         key_file_path = key_file.name
+
+#     try:
+#         # 3. Yield the paths to be used in the request
+#         yield (cert_file_path, key_file_path)
+#     finally:
+#         # 4. Clean up: Delete the temporary files after the request is done
+#         if os.path.exists(cert_file_path):
+#             os.remove(cert_file_path)
+#         if os.path.exists(key_file_path):
+#             os.remove(key_file_path)
+
+
 @contextmanager
 def teller_mtls_certs():
-    # 1. Get the text from environment variables
-    cert_data = os.getenv("TELLER_CERT_CONTENT")
-    key_data = os.getenv("TELLER_KEY_CONTENT")
+    # 1. Get the text and replace literal \n with actual newline characters
+    cert_raw = os.getenv("TELLER_CERT_CONTENT", "")
+    key_raw = os.getenv("TELLER_KEY_CONTENT", "")
+
+    # This handles the case where the \n is stored as a literal string
+    cert_data = cert_raw.replace("\\n", "\n")
+    key_data = key_raw.replace("\\n", "\n")
 
     if not cert_data or not key_data:
-        raise ValueError("Teller mTLS credentials missing from environment!")
+        raise ValueError("Teller mTLS credentials missing or empty in environment!")
 
     # 2. Create temporary files
-    with tempfile.NamedTemporaryFile(
-        mode="w", delete=False, suffix=".crt"
-    ) as cert_file, tempfile.NamedTemporaryFile(
-        mode="w", delete=False, suffix=".key"
-    ) as key_file:
+    # delete=False is required for Windows compatibility
+    cert_file = tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".crt")
+    key_file = tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".key")
 
+    cert_file_path = cert_file.name
+    key_file_path = key_file.name
+
+    try:
         cert_file.write(cert_data)
         key_file.write(key_data)
 
-        cert_file_path = cert_file.name
-        key_file_path = key_file.name
+        # VERY IMPORTANT: Close the files so the OS releases the lock
+        # before 'requests' tries to open them.
+        cert_file.close()
+        key_file.close()
 
-    try:
-        # 3. Yield the paths to be used in the request
+        # 3. Yield the paths for the request
         yield (cert_file_path, key_file_path)
     finally:
-        # 4. Clean up: Delete the temporary files after the request is done
+        # 4. Cleanup
         if os.path.exists(cert_file_path):
             os.remove(cert_file_path)
         if os.path.exists(key_file_path):
@@ -758,8 +798,8 @@ def refresh_transactions(current_user):
                 db.session.flush()  # Populate new_acc.id
                 active_acc = new_acc
             else:
-                active_acc.current_bal = float(bal_info.get("available", 0.0))
                 active_acc = existing_acc
+                active_acc.current_bal = float(bal_info.get("available", 0.0))
 
             buckets = {b.name: b for b in active_acc.buckets}
             if not buckets:
