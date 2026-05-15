@@ -800,6 +800,7 @@ def refresh_transactions(current_user):
             else:
                 active_acc = existing_acc
                 active_acc.current_bal = float(bal_info.get("available", 0.0))
+                db.session.flush()
 
             buckets = {b.name: b for b in active_acc.buckets}
             if not buckets:
@@ -951,7 +952,7 @@ def refresh_transactions(current_user):
                         percentage=b_data["perc"],
                         keywords=b_data["keywords"],
                         current_balance=0.0,
-                        user_id=user.id,
+                        user_id=current_user.id,
                         goal_amount=100.0,
                     )
                     db.session.add(new_b)
@@ -1022,8 +1023,8 @@ def get_user_buckets(current_user):
         for bucket in acc.buckets:
             # Simple math for the progress bar: (spent / goal) * 100
             # If goal is None, we just show the balance
-            if bucket.name.lower() == "income":
-                continue
+            # if bucket.name.lower() == "income":
+            #     continue
             calculated_goal = reference_income * (bucket.percentage / 100.0)
 
             acc_data["buckets"].append(
@@ -1108,13 +1109,46 @@ def move_transactions_bucket(current_user):
         id=new_bucket_id, user_id=current_user.id
     ).first()
 
-    transaction.bucket_id = new_bucket_id
-    transaction.bucket_name = new_bucket.name
-    transaction.bucket = new_bucket
-    current_bucket.current_balance -= transaction.amount
-    new_bucket.current_balance += transaction.amount
-    db.session.commit()
-    return jsonify({"message": "Transaction moved successfully"}), 200
+    if new_bucket.name.lower() == "income" and transaction.amount > 0:
+        # We need to chanve bucket id to income
+
+        assigned_bucket_id = new_bucket.id
+        account = Account.query.filter_by(
+            id=assigned_bucket_id, user_id=current_user.id
+        ).first()
+
+        if (
+            not account.last_paycheck_date
+            or transaction.date >= account.last_paycheck_date
+        ):
+            account.last_paycheck_amount = abs(float(transaction.amount))
+            account.last_paycheck_date = transaction.date
+            # RESET LOGIC: New paycheck means clear the buckets!
+            for b in account.buckets:
+                b.current_balance = 0.0
+
+            db.session.flush()
+        # and then refresh
+        transaction.bucket_id = new_bucket_id
+        transaction.bucket_name = new_bucket.name
+        transaction.bucket = new_bucket
+        current_bucket.current_balance -= transaction.amount
+        new_bucket.current_balance = transaction.amount
+        db.session.commit()
+        pass
+    elif current_bucket.name.lower() == "income" and transaction.amount < 0:
+        # We do nothing and fail silently (Don't allow moving expenses INTO income or moving income OUT of income)
+        pass
+
+    else:
+
+        transaction.bucket_id = new_bucket_id
+        transaction.bucket_name = new_bucket.name
+        transaction.bucket = new_bucket
+        current_bucket.current_balance -= transaction.amount
+        new_bucket.current_balance += transaction.amount
+        db.session.commit()
+        return jsonify({"message": "Transaction moved successfully"}), 200
 
 
 @app.route("/api/save-subscription", methods=["POST"])
