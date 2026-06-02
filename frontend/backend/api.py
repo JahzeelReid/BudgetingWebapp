@@ -975,9 +975,15 @@ def refresh_transactions(current_user):
         db.session.commit()
     return jsonify({"status": "complete", "user_id": current_user.id})
 
-    # get all transactions since the last paycheck date for all accounts and re-run the categorization logic
-
-    pass
+@app.route("/api/refresh_after_income", methods=["POST"])
+@token_required
+def refresh_transactions(current_user):
+    # paycheck is updated but buckets are not, 
+    # this code will ilterate throught the accounts from current user
+    # set buckets to 0
+    # can I update the buckets
+    # without changing the transactions
+    # I dont know Ill have to check?
 
 
 @app.route("/api/sync-status", methods=["GET"])
