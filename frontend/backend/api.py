@@ -1183,10 +1183,12 @@ def move_transactions_bucket(current_user):
         new_bucket.current_balance = transaction.amount
         db.session.commit()
         update_transaction_count_after_income_change(current_user)
+        return jsonify({"message": "Transaction moved successfully"}), 200
 
     elif new_bucket.name.lower() == "income" and transaction.amount < 0:
         # We do nothing and fail silently (Don't allow moving expenses INTO income or moving income OUT of income)
         print("Attempted to move charge of", transaction.amount, "into income bucket")
+        return jsonify({"message": "Transaction failed successfully"}), 200
 
     else:
         print(
