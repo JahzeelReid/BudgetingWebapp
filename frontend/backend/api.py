@@ -1151,7 +1151,7 @@ def move_transactions_bucket(current_user):
     if new_bucket.name.lower() == "income" and transaction.amount > 0:
         # We need to chanve bucket id to income
         print(
-            "Moving transaction id: ",
+            "Moving income id: ",
             transaction.id,
             "from bucket: ",
             current_bucket.name,
@@ -1161,7 +1161,7 @@ def move_transactions_bucket(current_user):
 
         assigned_bucket_id = new_bucket.id
         account = Account.query.filter_by(
-            id=assigned_bucket_id, user_id=current_user.id
+            id=new_bucket.account_id, user_id=current_user.id
         ).first()
 
         if (
