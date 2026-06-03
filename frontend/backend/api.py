@@ -21,7 +21,6 @@ import json
 from pywebpush import webpush, WebPushException
 from urllib.parse import urlparse
 
-
 print(f"DEBUG: VAPID_KEY is {os.getenv('VAPID_CLAIM_EMAIL')}")
 
 
@@ -930,6 +929,7 @@ def refresh_transactions(current_user):
                             "tax refund",
                             "dividend",
                             "interest",
+                            "Achievement",
                         ],
                     },
                     {
@@ -975,15 +975,48 @@ def refresh_transactions(current_user):
         db.session.commit()
     return jsonify({"status": "complete", "user_id": current_user.id})
 
-@app.route("/api/refresh_after_income", methods=["POST"])
-@token_required
-def refresh_transactions(current_user):
-    # paycheck is updated but buckets are not, 
+
+def update_transaction_count_after_income_change(current_user):
+    # paycheck is updated but buckets are not,
     # this code will ilterate throught the accounts from current user
     # set buckets to 0
     # can I update the buckets
     # without changing the transactions
     # I dont know Ill have to check?
+    accounts = db.session.query(Account).filter_by(user_id=current_user.id).all()
+    for acc in accounts:
+        # reset all buckets
+        for bucket in acc.buckets:
+            bucket.current_balance = 0.0
+        # get the last paycheck amount and date
+        last_paycheck_amount = acc.last_paycheck_amount
+        last_paycheck_date = acc.last_paycheck_date
+        # get all transactions after the last paycheck date
+        # they transactions can stay in the same bucket but do the addtion over
+        # get last paycheck transction id
+        last_paycheck_transaction = (
+            db.session.query(Transaction)
+            .filter(
+                Transaction.account_id == acc.id,
+                Transaction.date == last_paycheck_date,
+                Transaction.amount == last_paycheck_amount,
+            )
+            .first()
+        )
+        transactions = (
+            db.session.query(Transaction)
+            .filter(
+                Transaction.account_id == acc.id,
+                Transaction.date >= last_paycheck_date,
+                Transaction.id != last_paycheck_transaction.id,
+            )
+            .order_by(Transaction.date.desc())
+        ).all()
+        for tx in transactions:
+            bucket = db.session.query(Bucket).filter_by(id=tx.bucket_id).first()
+            bucket.current_balance += tx.amount
+
+    db.session.commit()
 
 
 @app.route("/api/sync-status", methods=["GET"])
@@ -1117,6 +1150,14 @@ def move_transactions_bucket(current_user):
 
     if new_bucket.name.lower() == "income" and transaction.amount > 0:
         # We need to chanve bucket id to income
+        print(
+            "Moving transaction id: ",
+            transaction.id,
+            "from bucket: ",
+            current_bucket.name,
+            "to bucket: ",
+            new_bucket.name,
+        )
 
         assigned_bucket_id = new_bucket.id
         account = Account.query.filter_by(
@@ -1141,12 +1182,21 @@ def move_transactions_bucket(current_user):
         current_bucket.current_balance -= transaction.amount
         new_bucket.current_balance = transaction.amount
         db.session.commit()
-        pass
-    elif current_bucket.name.lower() == "income" and transaction.amount < 0:
+        update_transaction_count_after_income_change(current_user)
+
+    elif new_bucket.name.lower() == "income" and transaction.amount < 0:
         # We do nothing and fail silently (Don't allow moving expenses INTO income or moving income OUT of income)
-        pass
+        print("Attempted to move charge of", transaction.amount, "into income bucket")
 
     else:
+        print(
+            "Moving transaction id: ",
+            transaction.id,
+            "from bucket: ",
+            current_bucket.name,
+            "to bucket: ",
+            new_bucket.name,
+        )
 
         transaction.bucket_id = new_bucket_id
         transaction.bucket_name = new_bucket.name
