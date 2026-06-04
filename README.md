@@ -45,7 +45,7 @@ Backend Setup (Flask)
 Clone the repository and navigate to the backend directory:
 
 Bash
-git clone https://github.com/your_username/repo_name.git
+git clone https://github.com/JahzeelReid/BudgetingWebapp/tree/fresh-start
 cd repo_name/backend
 Create and activate a virtual environment:
 
