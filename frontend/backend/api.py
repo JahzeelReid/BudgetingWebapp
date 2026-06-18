@@ -107,6 +107,9 @@ class Account(db.Model):
     transactions: Mapped[list["Transaction"]] = relationship(
         back_populates="account", cascade="all, delete-orphan"
     )
+    records: Mapped[list["Bucket"]] = relationship(
+        back_populates="record", cascade="all, delete-orphan"
+    )
 
 
 class Bucket(db.Model):
@@ -145,6 +148,17 @@ class Transaction(db.Model):
 
     bucket: Mapped["Bucket"] = relationship(back_populates="transactions")
     account: Mapped["Account"] = relationship(back_populates="transactions")
+
+class Record(db.Model):
+    __tablename__ = "record"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("user.id"), nullable=False)
+    account: Mapped["Account"] = relationship(back_populates="records")
+    income: Mapped[float] = mapped_column(Float, default=0.0)
+    paycheck_date: Mapped[str] = mapped_column(String(50), nullable=True)
+    bucket_goal: Mapped[dict] = mapped_column(JSON, nullable=True)
+    bucket_amount: Mapped[dict] = mapped_column(JSON, nullable=True)
+
 
 
 with app.app_context():
@@ -615,6 +629,25 @@ def perform_initial_90_day_sync(user):
         db.session.commit()
     return jsonify({"status": "complete", "user_id": user.id})
 
+def log_pay_period(account):
+    # lets create a log
+    current = {}
+    goals = {}
+    for bucket in account.buckets:
+        current[bucket.name] = bucket.current_balance
+        goals[bucket.name] = bucket.goal_amount
+    new_log = Log(
+        user_id = account.user_id
+        account = account
+        income = account.last_paycheck_amount
+        paycheck_date = account.last_paycheck_date
+        bucket_goal = goals
+        bucket_amount = current
+    )
+    db.session.add(new_log)
+    db.session.commit()
+    
+
 
 def transaction_categorization(transactions, account):
     if account is None:
@@ -702,6 +735,10 @@ def transaction_categorization(transactions, account):
             ):
                 account.last_paycheck_amount = abs(float(tx["amount"]))
                 account.last_paycheck_date = tx["date"]
+
+                # LOG HERE
+                log_pay_period(account)
+
                 # RESET LOGIC: New paycheck means clear the buckets!
                 for b in account.buckets:
                     b.current_balance = 0.0
@@ -1128,6 +1165,18 @@ def get_bucket_transactions(current_user):
 
     return jsonify({"transactions": tx_list}), 200
 
+def remove_transactions_bucket(account, date):
+    # remove value of transactions from buckets of any transaction between date and last paycheck dat
+
+    transactions = (
+        Transaction.query.filter(
+            Transaction.user_id == current_user.id,
+            Transaction.bucket_id == bucket_id,
+            Transaction.date >= account.last_paycheck_date,
+        )
+        .order_by(Transaction.date.desc())
+        .all()
+    )
 
 @app.route("/api/move_transactions_bucket", methods=["POST"])
 @token_required
@@ -1171,6 +1220,8 @@ def move_transactions_bucket(current_user):
             account.last_paycheck_amount = abs(float(transaction.amount))
             account.last_paycheck_date = transaction.date
             # RESET LOGIC: New paycheck means clear the buckets!
+            # Remove transactions between now and this income transaction
+            log_pay_period(account)
             for b in account.buckets:
                 b.current_balance = 0.0
 
