@@ -3,6 +3,7 @@ import time
 import traceback
 from flask import Flask, jsonify, request
 from flask_sqlalchemy import SQLAlchemy
+from flask_migrate import Migrate
 from sqlalchemy import JSON, String, Float, ForeignKey
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -63,6 +64,7 @@ app.config["SECRET_KEY"] = os.getenv("SECRET_KEY", "dev-secret-key-123")
 
 # Initialize Extension
 db = SQLAlchemy(model_class=Base, engine_options={"pool_pre_ping": True})
+migrate = Migrate(app, db)
 db.init_app(app)
 
 
@@ -107,8 +109,8 @@ class Account(db.Model):
     transactions: Mapped[list["Transaction"]] = relationship(
         back_populates="account", cascade="all, delete-orphan"
     )
-    records: Mapped[list["Bucket"]] = relationship(
-        back_populates="record", cascade="all, delete-orphan"
+    records: Mapped[list["Record"]] = relationship(
+        back_populates="account", cascade="all, delete-orphan"
     )
 
 
@@ -149,6 +151,7 @@ class Transaction(db.Model):
     bucket: Mapped["Bucket"] = relationship(back_populates="transactions")
     account: Mapped["Account"] = relationship(back_populates="transactions")
 
+
 class Record(db.Model):
     __tablename__ = "record"
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -158,7 +161,7 @@ class Record(db.Model):
     paycheck_date: Mapped[str] = mapped_column(String(50), nullable=True)
     bucket_goal: Mapped[dict] = mapped_column(JSON, nullable=True)
     bucket_amount: Mapped[dict] = mapped_column(JSON, nullable=True)
-
+    account_id: Mapped[int] = mapped_column(ForeignKey("account.id"), nullable=False)
 
 
 with app.app_context():
@@ -237,7 +240,7 @@ def register():
     password = data.get("password")
     email = data.get("email")
 
-    existing_user = User.query.filter_by(username=username).first()
+    existing_user = db.session.query(User).filter_by(username=username).first()
     if existing_user:
         return jsonify({"message": "User already exists. Please login."}), 400
 
@@ -332,52 +335,86 @@ def initialize_teller(current_user):
 
 # @contextmanager
 # def teller_mtls_certs():
-#     # 1. Get the text from environment variables
-#     cert_data = os.getenv("TELLER_CERT_CONTENT")
-#     key_data = os.getenv("TELLER_KEY_CONTENT")
+#     # 1. Get the text and replace literal \n with actual newline characters
+#     cert_raw = os.getenv("TELLER_CERT_CONTENT", "")
+#     key_raw = os.getenv("TELLER_KEY_CONTENT", "")
+
+#     # This handles the case where the \n is stored as a literal string
+#     cert_data = cert_raw.replace("\\n", "\n")
+#     key_data = key_raw.replace("\\n", "\n")
 
 #     if not cert_data or not key_data:
-#         raise ValueError("Teller mTLS credentials missing from environment!")
+#         raise ValueError("Teller mTLS credentials missing or empty in environment!")
 
 #     # 2. Create temporary files
-#     with tempfile.NamedTemporaryFile(
-#         mode="w", delete=False, suffix=".crt"
-#     ) as cert_file, tempfile.NamedTemporaryFile(
-#         mode="w", delete=False, suffix=".key"
-#     ) as key_file:
+#     # delete=False is required for Windows compatibility
+#     cert_file = tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".crt")
+#     key_file = tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".key")
 
+#     cert_file_path = cert_file.name
+#     key_file_path = key_file.name
+
+#     try:
 #         cert_file.write(cert_data)
 #         key_file.write(key_data)
 
-#         cert_file_path = cert_file.name
-#         key_file_path = key_file.name
+#         # VERY IMPORTANT: Close the files so the OS releases the lock
+#         # before 'requests' tries to open them.
+#         cert_file.close()
+#         key_file.close()
 
-#     try:
-#         # 3. Yield the paths to be used in the request
+#         # 3. Yield the paths for the request
 #         yield (cert_file_path, key_file_path)
 #     finally:
-#         # 4. Clean up: Delete the temporary files after the request is done
+#         # 4. Cleanup
 #         if os.path.exists(cert_file_path):
 #             os.remove(cert_file_path)
 #         if os.path.exists(key_file_path):
 #             os.remove(key_file_path)
 
+import os
+import tempfile
+import logging
+from contextlib import contextmanager
+
+logger = logging.getLogger(__name__)
+
 
 @contextmanager
 def teller_mtls_certs():
-    # 1. Get the text and replace literal \n with actual newline characters
-    cert_raw = os.getenv("TELLER_CERT_CONTENT", "")
-    key_raw = os.getenv("TELLER_KEY_CONTENT", "")
+    """
+    Provides paths to Teller mTLS certificate and key files.
+    Prefers local physical files if present (for dev), otherwise
+    builds temporary files from environment variables (for prod).
+    """
+    # 1. Local Dev Bypass: Look for physical files first
+    # (Make sure to add the 'certs/' folder to your .gitignore!)
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    local_cert_path = os.path.join(base_dir, "certs", "certificate.pem")
+    local_key_path = os.path.join(base_dir, "certs", "private_key.pem")
 
-    # This handles the case where the \n is stored as a literal string
+    if os.path.exists(local_cert_path) and os.path.exists(local_key_path):
+        logger.debug("Using physical Teller certificates for mTLS.")
+        print("Using physical Teller certificates for mTLS.")
+        yield (local_cert_path, local_key_path)
+        return  # Exit early; no cleanup needed for physical files
+
+    # 2. Production Path: Parse Environment Variables
+    # .strip() is crucial here to remove leading/trailing quotes from .env loaders
+    cert_raw = os.getenv("TELLER_CERT_CONTENT", "").strip('"').strip("'")
+    key_raw = os.getenv("TELLER_KEY_CONTENT", "").strip('"').strip("'")
+
+    if not cert_raw or not key_raw:
+        raise ValueError(
+            "Teller mTLS credentials missing! Provide local files or environment variables."
+        )
+
+    # Convert literal '\n' characters into actual line breaks
     cert_data = cert_raw.replace("\\n", "\n")
     key_data = key_raw.replace("\\n", "\n")
 
-    if not cert_data or not key_data:
-        raise ValueError("Teller mTLS credentials missing or empty in environment!")
-
-    # 2. Create temporary files
-    # delete=False is required for Windows compatibility
+    # 3. Create Temporary Files
+    # delete=False is required to prevent Windows from locking/deleting early
     cert_file = tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".crt")
     key_file = tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".key")
 
@@ -388,19 +425,22 @@ def teller_mtls_certs():
         cert_file.write(cert_data)
         key_file.write(key_data)
 
-        # VERY IMPORTANT: Close the files so the OS releases the lock
-        # before 'requests' tries to open them.
+        # VERY IMPORTANT: Close before yielding so 'requests' can open them
         cert_file.close()
         key_file.close()
 
-        # 3. Yield the paths for the request
         yield (cert_file_path, key_file_path)
+
     finally:
-        # 4. Cleanup
-        if os.path.exists(cert_file_path):
-            os.remove(cert_file_path)
-        if os.path.exists(key_file_path):
-            os.remove(key_file_path)
+        # 4. Robust Cleanup
+        for file_path in (cert_file_path, key_file_path):
+            if os.path.exists(file_path):
+                try:
+                    os.remove(file_path)
+                except OSError as e:
+                    logger.warning(
+                        f"Failed to clean up temp mTLS file {file_path}: {e}"
+                    )
 
 
 def perform_initial_90_day_sync(user):
@@ -629,24 +669,25 @@ def perform_initial_90_day_sync(user):
         db.session.commit()
     return jsonify({"status": "complete", "user_id": user.id})
 
+
 def log_pay_period(account):
     # lets create a log
     current = {}
     goals = {}
     for bucket in account.buckets:
         current[bucket.name] = bucket.current_balance
-        goals[bucket.name] = bucket.goal_amount
-    new_log = Log(
-        user_id = account.user_id
-        account = account
-        income = account.last_paycheck_amount
-        paycheck_date = account.last_paycheck_date
-        bucket_goal = goals
-        bucket_amount = current
+        goals[bucket.name] = account.last_paycheck_amount * (bucket.percentage / 100.0)
+    new_log = Record(
+        user_id=account.user_id,
+        account=account,
+        account_id=account.id,
+        income=account.last_paycheck_amount,
+        paycheck_date=account.last_paycheck_date,
+        bucket_goal=goals,
+        bucket_amount=current,
     )
     db.session.add(new_log)
     db.session.commit()
-    
 
 
 def transaction_categorization(transactions, account):
@@ -733,11 +774,13 @@ def transaction_categorization(transactions, account):
                 not account.last_paycheck_date
                 or tx["date"] >= account.last_paycheck_date
             ):
+                
+                # LOG HERE
+                log_pay_period(account)
                 account.last_paycheck_amount = abs(float(tx["amount"]))
                 account.last_paycheck_date = tx["date"]
 
-                # LOG HERE
-                log_pay_period(account)
+                
 
                 # RESET LOGIC: New paycheck means clear the buckets!
                 for b in account.buckets:
@@ -1093,6 +1136,7 @@ def get_user_buckets(current_user):
             "last_paycheck": reference_income,
             "last_paycheck_date": acc.last_paycheck_date or "",
             "buckets": [],
+            "graph": False,
             "teller_account_id": acc.teller_account_id,
         }
 
@@ -1116,6 +1160,45 @@ def get_user_buckets(current_user):
         accounts.append(acc_data)
     # print("Returning buckets for user_id: ", current_user.id, "Accounts: ", accounts)
     return jsonify({"accounts": accounts}), 200
+
+@app.route("/api/bucket-records", methods=["POST"])
+@token_required
+def get_bucket_records(current_user):
+    data = request.get_json()
+    accdata = data.get("account")
+    account = Account.query.filter_by(id=accdata, user_id=current_user.id).first()
+    if not account:
+        return jsonify({"error": "Account not found or inaccessible"}), 404
+    
+    results = {}
+    # results : {gas: {goal: [], current: []}, dining: {goal: [], current: []}}}
+    # results: [{date}]
+    records = Record.query.filter_by(account_id=account.id).order_by(Record.paycheck_date).all()
+    formatted_dataset = []
+    for record in records:
+            # Start the flattened dictionary with the primary X-axis value
+            flat_entry = {
+                "date": record.paycheck_date
+            }
+            
+            # 3. Append current amounts with the "_current" suffix
+            if record.bucket_amount:
+                for category, amount in record.bucket_amount.items():
+                    # e.g., "groceries_current": 380
+                    flat_entry[f"{category}_current"] = amount * -1
+            
+            # 4. Append goal amounts with the "_goal" suffix
+            if record.bucket_goal:
+                for category, amount in record.bucket_goal.items():
+                    # e.g., "groceries_goal": 400
+                    flat_entry[f"{category}_goal"] = amount
+            
+            formatted_dataset.append(flat_entry)
+
+        # 5. Return the flattened array as JSON
+    return jsonify(formatted_dataset), 200
+    
+
 
 
 @app.route("/api/bucket-transactions", methods=["POST"])
@@ -1165,18 +1248,30 @@ def get_bucket_transactions(current_user):
 
     return jsonify({"transactions": tx_list}), 200
 
-def remove_transactions_bucket(account, date):
+
+def remove_transactions_bucket(account, trans):
     # remove value of transactions from buckets of any transaction between date and last paycheck dat
+    # helper function that subtracts the values of transaction that happen after an income is incorretly not applied
+    # this is so that we can log the payperiod properly with only the transaction of that pay period in it
+    # im thinkking of removing all transaction that have the same date as the paycheck and after
 
     transactions = (
         Transaction.query.filter(
-            Transaction.user_id == current_user.id,
-            Transaction.bucket_id == bucket_id,
-            Transaction.date >= account.last_paycheck_date,
+            Transaction.user_id == trans.user_id,
+            Transaction.account_id == trans.account_id,
+            # Transaction.bucket_id == transbucket_id,
+            Transaction.date >= trans.date,
         )
         .order_by(Transaction.date.desc())
         .all()
+        # iterate through this list to remove the balance from the buckets
     )
+    for tx in transactions:
+        bucket = tx.bucket
+        remove_val = tx.amount * -1
+        bucket.current_balance += remove_val
+    db.session.commit()
+
 
 @app.route("/api/move_transactions_bucket", methods=["POST"])
 @token_required
@@ -1217,11 +1312,13 @@ def move_transactions_bucket(current_user):
             not account.last_paycheck_date
             or transaction.date >= account.last_paycheck_date
         ):
-            account.last_paycheck_amount = abs(float(transaction.amount))
-            account.last_paycheck_date = transaction.date
             # RESET LOGIC: New paycheck means clear the buckets!
             # Remove transactions between now and this income transaction
+            remove_transactions_bucket(account, transaction)
             log_pay_period(account)
+            account.last_paycheck_amount = abs(float(transaction.amount))
+            account.last_paycheck_date = transaction.date
+            
             for b in account.buckets:
                 b.current_balance = 0.0
 
@@ -1453,6 +1550,17 @@ def update_bucket_goals(current_user):
         if bucket:
             bucket.percentage = b["percentage"]
             bucket.goal_amount = b["goal_amount"]
+        else:
+            new_bucket = Bucket(
+                account_id=acc.id,
+                name=b["name"],
+                percentage=b["percentage"],
+                keywords=[],
+                current_balance=0.0,
+                user_id=current_user.id,
+                goal_amount=b["goal_amount"],
+            )
+            db.session.add(new_bucket)
 
     db.session.commit()
 
