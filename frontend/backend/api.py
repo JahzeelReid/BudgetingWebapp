@@ -377,7 +377,7 @@ def initialize_teller(current_user):
 
     data = request.get_json()
     personal_token = "aHR0cHM6Ly9iZXRhLWJyaWRnZS5zaW1wbGVmaW4ub3JnL3NpbXBsZWZpbi9jbGFpbS8zMkEzOTE4QTU1MUQxQUFFQjc0MkREMUMzMDM1NTJGNTEyODYzOEE5RjI3QjA0OUJFMjk4NzU2NUUzMzI4QTMwNEM5MzlFNzhGQzQ1MjNCNDlBMEFBMTE5REIyOERDNzBDQTRCMzc1QzVEQzAyNkQ2NDY0QTA4M0NDQzM4Q0FDMA=="
-    token = claim_simplefin_token(personal_token)  # Claim the token first
+    token = claim_simplefin_token(data.get("setup_token"))  # Claim the token first
     current_user.access_token = token
     current_user.sync_status = "processing"  # New column in User model
     db.session.commit()
