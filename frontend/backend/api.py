@@ -250,10 +250,11 @@ def claim_simplefin_token(setup_token):
     access_url = response.text
     print("Successfully claimed SimpleFIN Access URL:", access_url)
     access = "https://213C82032F6081D79DDF23B61E70B7FBBC9E5A3CCA27AF1D186890DB3FC17FE1:9B65371A12B9FB3C7ABE3B6943B91852C05A3C6E3DCD3A74BDD08E023D756720@beta-bridge.simplefin.org/simplefin"
-    return jsonify({
-            'status': 'success',
-            'message': 'Successfully linked SimpleFIN account: ' + access_url,
-        }), 200
+    return access_url
+    # return jsonify({
+    #         'status': 'success',
+    #         'message': 'Successfully linked SimpleFIN account: ' + access_url,
+    #     }), 200
 
 @app.route('/api/simplefin/acc', methods=['GET'])
 def get_simplefin_accounts():
@@ -376,7 +377,7 @@ def initialize_teller(current_user):
     # add error handling for missing token
 
     data = request.get_json()
-    personal_token = "aHR0cHM6Ly9iZXRhLWJyaWRnZS5zaW1wbGVmaW4ub3JnL3NpbXBsZWZpbi9jbGFpbS8zMkEzOTE4QTU1MUQxQUFFQjc0MkREMUMzMDM1NTJGNTEyODYzOEE5RjI3QjA0OUJFMjk4NzU2NUUzMzI4QTMwNEM5MzlFNzhGQzQ1MjNCNDlBMEFBMTE5REIyOERDNzBDQTRCMzc1QzVEQzAyNkQ2NDY0QTA4M0NDQzM4Q0FDMA=="
+    
     token = claim_simplefin_token(data.get("setup_token"))  # Claim the token first
     current_user.access_token = token
     current_user.sync_status = "processing"  # New column in User model
