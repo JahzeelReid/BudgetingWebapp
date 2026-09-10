@@ -1,6 +1,7 @@
 import os
 import time
 import traceback
+from urllib import response
 from flask import Flask, jsonify, request
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
@@ -11,7 +12,8 @@ import jwt
 import uuid
 from functools import wraps
 from flask_cors import CORS
-import datetime
+# import datetime
+from datetime import date, datetime, timedelta
 from requests.auth import HTTPBasicAuth
 import requests
 import tempfile
@@ -21,6 +23,7 @@ from dotenv import load_dotenv
 import json
 from pywebpush import webpush, WebPushException
 from urllib.parse import urlparse
+import base64
 
 print(f"DEBUG: VAPID_KEY is {os.getenv('VAPID_CLAIM_EMAIL')}")
 
@@ -232,6 +235,53 @@ def token_required(f):
     return decorated
 
 
+# @app.route('/api/simplefin/claim', methods=['GET'])
+def claim_simplefin_token(setup_token):
+    """Claims a SimpleFIN setup token, exchanges it for a permanent Access URL,
+
+    and returns success.
+    """
+    # data = request.get_json() or {}
+    # setup_token = data.get('setup_token')
+    setup_token = "178ADDAC199C07337FF75F93DFE6270649E437AFEC279E0FDFB024BFF1F9DE5C"
+    setup_token = "aHR0cHM6Ly9iZXRhLWJyaWRnZS5zaW1wbGVmaW4ub3JnL3NpbXBsZWZpbi9jbGFpbS84QjkwOEQyMzNFRUQxQjdCQTZFMjQzNzM5QTZEMTFGMkJERTY3MkM0MzgzNjNBMjIwRTQ4QjM2MDJBRUVGNDc4MEFDQjNCRTVBQkQ5NTRCQ0NFMUVCMkMxQzIyRjNGNjY3MzNDQTcxOEE4MzhFRjk4RDkxRkRGQUY1OEUyQjNCQg=="
+    claim_url = base64.b64decode(setup_token)
+    response = requests.post(claim_url)
+    access_url = response.text
+    print("Successfully claimed SimpleFIN Access URL:", access_url)
+    access = "https://213C82032F6081D79DDF23B61E70B7FBBC9E5A3CCA27AF1D186890DB3FC17FE1:9B65371A12B9FB3C7ABE3B6943B91852C05A3C6E3DCD3A74BDD08E023D756720@beta-bridge.simplefin.org/simplefin"
+    return jsonify({
+            'status': 'success',
+            'message': 'Successfully linked SimpleFIN account: ' + access_url,
+        }), 200
+
+@app.route('/api/simplefin/acc', methods=['GET'])
+def get_simplefin_accounts():
+    """Fetches accounts from SimpleFIN using the stored Access URL."""
+    access = "https://213C82032F6081D79DDF23B61E70B7FBBC9E5A3CCA27AF1D186890DB3FC17FE1:9B65371A12B9FB3C7ABE3B6943B91852C05A3C6E3DCD3A74BDD08E023D756720@beta-bridge.simplefin.org/simplefin"
+    url = f"{access}/accounts"
+    
+    
+    start_date = int((datetime.now() - timedelta(days=30)).timestamp())
+
+    params = {
+        'version': '2',
+        'start-date': start_date,  # Unix timestamp
+        # 'end-date': int(datetime.now().timestamp()) # optional
+    }
+    response = requests.get(url, params=params)
+    response.raise_for_status()
+        
+    data = response.json()
+    print("Fetched SimpleFIN accounts:", data)
+    
+
+    return jsonify({
+        'status': 'success',
+        'message': 'Fetched SimpleFIN accounts: ' + str(data),
+    }), 200
+
+
 @app.route("/api/signup", methods=["POST"])
 def register():
 
@@ -280,7 +330,8 @@ def login():
     token = jwt.encode(
         {
             "public_id": user.public_id,
-            "exp": datetime.datetime.utcnow() + datetime.timedelta(hours=24),
+            # "exp": datetime.datetime.utcnow() + datetime.timedelta(hours=24),
+            "exp": datetime.utcnow() + timedelta(hours=24)
         },
         app.config["SECRET_KEY"],
         algorithm="HS256",
@@ -321,8 +372,13 @@ def update_access(current_user):
 @token_required
 def initialize_teller(current_user):
     # 1. Save Token
+    # Change this to take a user provided token from the request body instead of hardcoding
+    # add error handling for missing token
+
     data = request.get_json()
-    current_user.access_token = data.get("teller_access_token")
+    personal_token = "aHR0cHM6Ly9iZXRhLWJyaWRnZS5zaW1wbGVmaW4ub3JnL3NpbXBsZWZpbi9jbGFpbS8zMkEzOTE4QTU1MUQxQUFFQjc0MkREMUMzMDM1NTJGNTEyODYzOEE5RjI3QjA0OUJFMjk4NzU2NUUzMzI4QTMwNEM5MzlFNzhGQzQ1MjNCNDlBMEFBMTE5REIyOERDNzBDQTRCMzc1QzVEQzAyNkQ2NDY0QTA4M0NDQzM4Q0FDMA=="
+    token = claim_simplefin_token(personal_token)  # Claim the token first
+    current_user.access_token = token
     current_user.sync_status = "processing"  # New column in User model
     db.session.commit()
 
@@ -455,17 +511,29 @@ def perform_initial_90_day_sync(user):
     with teller_mtls_certs() as cert_bundle:
 
         # 1. Get Accounts from Teller
-        accounts_response = requests.get(
-            "https://api.teller.io/accounts", auth=auth, cert=cert_bundle
-        )
-        if accounts_response.status_code != 200:
-            return jsonify({"error": "Failed to fetch accounts from Teller"}), 400
+        # accounts_response = requests.get(
+        #     "https://api.teller.io/accounts", auth=auth, cert=cert_bundle
+        # )
+        # Get data from simplefin
+        url = f"{access_token}/accounts"
+        start_date = int((datetime.now() - timedelta(days=30)).timestamp())
+        params = {
+            'version': '2',
+            'start-date': start_date,  # Unix timestamp
+            # 'end-date': int(datetime.now().timestamp()) # optional
+        }
+        response = requests.get(url, params=params)
+        response.raise_for_status()
+        data = response.json()
+        print("Fetched SimpleFIN accounts:", data)
 
-        accounts = accounts_response.json()
-        three_months_ago = (
-            datetime.datetime.now() - datetime.timedelta(days=90)
-        ).date()
+        # if accounts_response.status_code != 200:
+        #     return jsonify({"error": "Failed to fetch accounts from Teller"}), 400
 
+        accounts = data.get("accounts", [])
+        # looks like {'errlist': [...], 'accounts': 
+        # [{'id':'...', 'name': 'name (last4)', 'balance': '0.0', 'balance-date': 'strange value like 1786752565'}, 
+        # {...}]}
         for acc_data in accounts:
 
             # 2. Check if account already exists to avoid unique constraint errors
@@ -476,20 +544,21 @@ def perform_initial_90_day_sync(user):
             )
             if not existing_acc:
                 # Fetch Balance for the new account
-                bal_info = requests.get(
-                    acc_data["links"]["balances"], auth=auth, cert=cert_bundle
-                ).json()
+                # bal_info = requests.get(
+                #     acc_data["links"]["balances"], auth=auth, cert=cert_bundle
+                # ).json()
+                # no need for bal_info as it
+                fin_name = acc_data.get("name", "")
+                name, number = fin_name.rstrip(")").rsplit(" (", 1)
 
                 new_acc = Account(
                     user_id=user.id,
                     teller_account_id=acc_data["id"],  # Matches your model
-                    institution_name=acc_data.get("institution", {}).get(
-                        "name", "Bank"
-                    ),
-                    current_bal=float(bal_info.get("available", 0.0)),
-                    last_four=acc_data["last_four"],
+                    institution_name=name,
+                    current_bal=float(acc_data.get("balance", 0.0)),
+                    last_four=number,
                     enrollment_id=acc_data.get(
-                        "enrollment_id", None
+                        "conn_id", None
                     ),  # Store enrollment_id if available
                 )
                 db.session.add(new_acc)
@@ -658,11 +727,8 @@ def perform_initial_90_day_sync(user):
                 buckets = {b.name: b for b in active_acc.buckets}
 
             # 4. Fetch Enriched Transactions
-            trans_response = requests.get(
-                acc_data["links"]["transactions"], auth=auth, cert=cert_bundle
-            )
-            if trans_response.status_code == 200:
-                transaction_categorization(trans_response, active_acc)
+            trans_response = acc_data.get("transactions", [])
+            transaction_categorization(trans_response, active_acc)
 
                 #     # break
 
@@ -691,16 +757,18 @@ def log_pay_period(account):
 
 
 def transaction_categorization(transactions, account):
+    print("Starting transaction categorization for account:", account.last_four)
     if account is None:
         check_individual_account_id = True
         new_transactions = transactions
     else:
         check_individual_account_id = False
-        new_transactions = transactions.json()
+        new_transactions = transactions
 
     notifs = []
 
     for tx in reversed(new_transactions):
+        print("Processing transaction: ", tx["id"], "Description: ", tx["description"], "Amount: ", tx["amount"])
         if check_individual_account_id:
             account_id = tx.get("account_id")
             account = (
@@ -709,7 +777,9 @@ def transaction_categorization(transactions, account):
                 .first()
             )
         # ... (Date filtering logic) ...
-        tx_date = datetime.datetime.strptime(tx["date"], "%Y-%m-%d").date()
+        # tx_date = datetime.datetime.strptime(tx["date"], "%Y-%m-%d").date()
+        # tx_date = datetime.datetime.fromtimestamp(tx["posted"]).date()
+        tx_date = datetime.fromtimestamp(tx["posted"]).date()
         # --- THE ENRICHED SORTING LOGIC ---
         # Access the 'details' object from Teller
 
@@ -718,12 +788,14 @@ def transaction_categorization(transactions, account):
         found_tx = (
             db.session.query(Transaction).filter_by(teller_transaction_id=id).first()
         )
+
+        print("Checking transaction ID: ", id, "Found in DB: ", found_tx is not None, "Date: ", tx_date, "Amount: ", tx["amount"], "Description: ", tx["description"])
         if found_tx:
             print("Transaction already exists in DB, skipping: ", id)
             continue  # Skip to the next transaction
 
-        details = tx.get("details", {})
-        teller_cat = details.get("category")  # e.g., "dining"
+        details = tx.get("extra", {})
+        teller_cat = details.get("category", None)  # e.g., "dining"
 
         # Look up our mapping, default to "General" if no match
 
@@ -770,15 +842,18 @@ def transaction_categorization(transactions, account):
         assigned_bucket_id = assigned_bucket.id
 
         if assigned_bucket.name.lower() == "income":
+            print("tx_date: ", tx_date, "account.last_paycheck_date: ", account.last_paycheck_date)
+            
             if (
                 not account.last_paycheck_date
-                or tx["date"] >= account.last_paycheck_date
+                or tx_date >= date.fromisoformat(str(account.last_paycheck_date))
+                # account.last_paycheck_date
             ):
                 
                 # LOG HERE
                 log_pay_period(account)
                 account.last_paycheck_amount = abs(float(tx["amount"]))
-                account.last_paycheck_date = tx["date"]
+                account.last_paycheck_date = tx_date
 
                 
 
@@ -794,7 +869,7 @@ def transaction_categorization(transactions, account):
             teller_transaction_id=tx["id"],
             amount=float(tx["amount"]),
             description=tx["description"],
-            date=tx["date"],
+            date=tx_date,
             bucket_id=assigned_bucket_id,
             category=teller_cat,
             bucket_name=assigned_bucket.name,
@@ -836,224 +911,8 @@ def transaction_categorization(transactions, account):
 @token_required
 def refresh_transactions(current_user):
     # Logic for refreshing transactions
-    data = request.get_json()
-    # Get access token
-    access_token = current_user.access_token
-    auth = HTTPBasicAuth(access_token, "")
-    with teller_mtls_certs() as cert_bundle:
-        accounts_response = requests.get(
-            "https://api.teller.io/accounts", auth=auth, cert=cert_bundle
-        )
-        if accounts_response.status_code != 200:
-            return jsonify({"error": "Failed to fetch accounts from Teller"}), 400
-
-        accounts = accounts_response.json()
-
-        for acc_data in accounts:
-            existing_acc = (
-                db.session.query(Account)
-                .filter_by(teller_account_id=acc_data["id"])
-                .first()
-            )
-            bal_info = requests.get(
-                acc_data["links"]["balances"], auth=auth, cert=cert_bundle
-            ).json()
-            if not existing_acc:
-                # Fetch Balance for the new account
-
-                new_acc = Account(
-                    user_id=current_user.id,
-                    teller_account_id=acc_data["id"],  # Matches your model
-                    institution_name=acc_data.get("institution", {}).get(
-                        "name", "Bank"
-                    ),
-                    current_bal=float(bal_info.get("available", 0.0)),
-                    last_four=acc_data["last_four"],
-                    enrollment_id=acc_data.get(
-                        "enrollment_id", None
-                    ),  # Store enrollment_id if available
-                )
-                db.session.add(new_acc)
-                db.session.flush()  # Populate new_acc.id
-                active_acc = new_acc
-            else:
-                active_acc = existing_acc
-                active_acc.current_bal = float(bal_info.get("available", 0.0))
-                db.session.flush()
-
-            buckets = {b.name: b for b in active_acc.buckets}
-            if not buckets:
-                # We create buckets that match the keys in our map
-
-                default_buckets = [
-                    {
-                        "name": "groceries",
-                        "perc": 10,
-                        "keywords": [
-                            "walmart",
-                            "wegmans",
-                            "wholefoods",
-                            "whole foods",
-                            "liquor",
-                            "aldi",
-                            "kroger",
-                            "publix",
-                            "safeway",
-                            "trader joe",
-                            "costco",
-                            "target",
-                            "market",
-                            "mkt",
-                            "grocery",
-                            "supermarket",
-                            "food mart",
-                            "bakery",
-                            "bake shop",
-                            "butcher",
-                            "dairy",
-                            "bodega",
-                            "mart",
-                            "ASSOCIATED FRESH BROOKLYN",
-                        ],
-                    },
-                    {
-                        "name": "gas",
-                        "perc": 5,
-                        "keywords": ["exxon", "shell", "wawa", "chevron", "sunoco"],
-                    },
-                    {
-                        "name": "dining",
-                        "perc": 15,
-                        "keywords": [
-                            "starbucks",
-                            "mcdonalds",
-                            "uber eats",
-                            "doordash",
-                            "grubhub",
-                            "postmates",
-                            "pizza",
-                            "deli",
-                            "dining",
-                            "restaurant",
-                            "tasty",
-                            "grill",
-                            "kitchen",
-                            "cafe",
-                            "bistro",
-                            "pub",
-                            "tavern",
-                            "bar",
-                            "coffee",
-                            "bakery",
-                            "steakhouse",
-                            "sushi",
-                            "burger",
-                            "diner",
-                            "eatery",
-                            "chipotle",
-                            "panera",
-                            "dunkin",
-                            "food",
-                            "terakawa",
-                        ],
-                    },
-                    {
-                        "name": "bills",
-                        "perc": 30,
-                        "keywords": [
-                            "verizon",
-                            "peco",
-                            "comcast",
-                            "netflix",
-                            "landlord",
-                            "sallie",
-                            "hannah",
-                            "discord",
-                            "spotify",
-                            "BK OF AMER VISA",
-                        ],
-                    },
-                    {
-                        "name": "transportation",
-                        "perc": 5,
-                        "keywords": [
-                            "uber",
-                            "lyft",
-                            "septa",
-                            "train",
-                            "parking",
-                            "flix",
-                            "mta",
-                        ],
-                    },
-                    {"name": "general", "perc": 10, "keywords": []},
-                    {
-                        "name": "income",
-                        "perc": 0,
-                        "keywords": [
-                            "paycheck",
-                            "deposit",
-                            "transfer from",
-                            "payroll",
-                            "ach dep",
-                            "dir dep",
-                            "net pay",
-                            "salary",
-                            "remuneration",
-                            "zelle",
-                            "venmo",
-                            "cash app",
-                            "square cash",
-                            "paypal",
-                            "irs treas",
-                            "tax refund",
-                            "dividend",
-                            "interest",
-                            "Achievement",
-                        ],
-                    },
-                    {
-                        "name": "subscriptions",
-                        "perc": 10,
-                        "keywords": [
-                            "spotify",
-                            "apple music",
-                            "netflix",
-                            "discord",
-                            "fitness",
-                            "render",
-                        ],
-                    },
-                ]
-                for b_data in default_buckets:
-                    new_b = Bucket(
-                        account_id=active_acc.id,
-                        name=b_data["name"],
-                        percentage=b_data["perc"],
-                        keywords=b_data["keywords"],
-                        current_balance=0.0,
-                        user_id=current_user.id,
-                        goal_amount=100.0,
-                    )
-                    db.session.add(new_b)
-                db.session.flush()
-                db.session.refresh(active_acc)
-                buckets = {b.name: b for b in active_acc.buckets}
-
-            # 4. Fetch Enriched Transactions
-            query_params = {"start_date": active_acc.last_paycheck_date}
-            trans_response = requests.get(
-                acc_data["links"]["transactions"],
-                auth=auth,
-                cert=cert_bundle,
-                params=query_params,
-            )
-            if trans_response.status_code == 200:
-                transaction_categorization(trans_response, active_acc)
-
-                #     # break
-        db.session.commit()
-    return jsonify({"status": "complete", "user_id": current_user.id})
+    
+    return perform_initial_90_day_sync(current_user)
 
 
 def update_transaction_count_after_income_change(current_user):
