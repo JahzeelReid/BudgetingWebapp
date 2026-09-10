@@ -243,8 +243,8 @@ def claim_simplefin_token(setup_token):
     """
     # data = request.get_json() or {}
     # setup_token = data.get('setup_token')
-    setup_token = "178ADDAC199C07337FF75F93DFE6270649E437AFEC279E0FDFB024BFF1F9DE5C"
-    setup_token = "aHR0cHM6Ly9iZXRhLWJyaWRnZS5zaW1wbGVmaW4ub3JnL3NpbXBsZWZpbi9jbGFpbS84QjkwOEQyMzNFRUQxQjdCQTZFMjQzNzM5QTZEMTFGMkJERTY3MkM0MzgzNjNBMjIwRTQ4QjM2MDJBRUVGNDc4MEFDQjNCRTVBQkQ5NTRCQ0NFMUVCMkMxQzIyRjNGNjY3MzNDQTcxOEE4MzhFRjk4RDkxRkRGQUY1OEUyQjNCQg=="
+    # setup_token = "178ADDAC199C07337FF75F93DFE6270649E437AFEC279E0FDFB024BFF1F9DE5C"
+    # setup_token = "aHR0cHM6Ly9iZXRhLWJyaWRnZS5zaW1wbGVmaW4ub3JnL3NpbXBsZWZpbi9jbGFpbS84QjkwOEQyMzNFRUQxQjdCQTZFMjQzNzM5QTZEMTFGMkJERTY3MkM0MzgzNjNBMjIwRTQ4QjM2MDJBRUVGNDc4MEFDQjNCRTVBQkQ5NTRCQ0NFMUVCMkMxQzIyRjNGNjY3MzNDQTcxOEE4MzhFRjk4RDkxRkRGQUY1OEUyQjNCQg=="
     claim_url = base64.b64decode(setup_token)
     response = requests.post(claim_url)
     access_url = response.text
